@@ -60,6 +60,7 @@ window.WL = window.WL || {};
     console.log('merged', mg);
     J.FX.init(J.S);
     J.CB.init(J.FX);
+    if (J.Slash) { J.Slash.init(); }
 
     // 主角
     var save = J.PROG.load();
@@ -81,6 +82,10 @@ window.WL = window.WL || {};
     J.NPC.build();
 
     J.UI.init();
+    var q = 1;
+    try { var qs = localStorage.getItem('wl_q'); if (qs !== null) q = +qs; } catch (e) { }
+    if (isNaN(q)) q = 1;
+    G.setQuality(q, true);
     var hint = document.getElementById('hint');
     if (hint) setTimeout(function () { hint.style.display = 'none'; }, 600);
     J.UI.toast('《武林 · 血刃江湖》　青溪镇', 3200);
@@ -143,6 +148,11 @@ window.WL = window.WL || {};
 
   function onResize() {
     var L = layout();
+    // 限制渲染总像素（手机 GPU 的填色能力是瓶颈）
+    var budget = 2.0e6;
+    var cap = Math.sqrt(budget / Math.max(1, L.w * L.h));
+    J.effDpr = Math.min(J.dpr, cap, J.dprMax);
+    J.R.setPixelRatio(Math.max(0.7, J.effDpr));
     J.R.setSize(L.w, L.h, false);
     J.C.aspect = L.w / L.h;
     J.C.fov = L.w / L.h > 1.7 ? 56 : 62;
@@ -157,6 +167,11 @@ window.WL = window.WL || {};
   window.__forcePortrait = function () { forcedPortrait = true; var r = document.getElementById('rotate'); if (r) r.classList.remove('show'); };
 
   var slowT = 0, simT = 0, frameCount = 0;
+  function _shadowAnchorDist(v) {
+    if (!J._sa) J._sa = new THREE.Vector2(9e9, 9e9);
+    return J._sa.distanceTo(v);
+  }
+
   function loop() {
     requestAnimationFrame(loop);
     var dt = Math.min(clock.getDelta(), 0.05);
@@ -169,6 +184,10 @@ window.WL = window.WL || {};
     var t = simT;
 
     J.IN.tick(dt);
+    // 手指已离开但摇杆值没归零（移动端丢 touchend）→ 强制复位
+    if (!J.UI.touchActive && (J.IN.move.x !== 0 || J.IN.move.y !== 0)) {
+      J.IN.move.x = 0; J.IN.move.y = 0; J.IN.run = false;
+    }
 
     // 命中顿帧
     var scale = 1;
@@ -200,33 +219,103 @@ window.WL = window.WL || {};
     J.H.mesh.position.copy(J.H.pos);
     J.H.mesh.rotation.y = J.H.yaw;
 
-    // 布料/旗帜摆动
-    var banners = J.S.children.filter(function (o) { return o.userData && o.userData.wave; });
-    for (var i = 0; i < banners.length; i++) {
-      var b = banners[i], pos = b.geometry.attributes.position;
-      for (var v = 0; v < pos.count; v++) {
-        if (pos.getZ(v) !== 0) continue;
-        var u = (pos.getX(v) / b.geometry.parameters.width + 0.5);
-        pos.setZ(v, Math.sin(t * 2.6 + u * 5 + i) * 0.1 * u);
+    // 布料摆动：只更新主角附近的旗帜（最多 6 面），每 3 帧一次
+    frameCount++;
+    if (J._banners === undefined) {
+      J._banners = [];
+      J.S.traverse(function (o) { if (o.userData && o.userData.wave) J._banners.push(o); });
+    }
+    if (frameCount % 3 === 0 && J._banners.length) {
+      var bn = J._banners;
+      for (var i = 0; i < bn.length; i++) {
+        var b = bn[i];
+        if (Math.abs(b.position.x - J.H.pos.x) > 45) continue;
+        var pos = b.geometry.attributes.position;
+        for (var v = 0; v < pos.count; v++) {
+          if (pos.getZ(v) !== 0) continue;
+          var u = (pos.getX(v) / b.geometry.parameters.width + 0.5);
+          pos.setZ(v, Math.sin(t * 2.6 + u * 5 + i) * 0.1 * u);
+        }
+        pos.needsUpdate = true;
       }
-      pos.needsUpdate = true;
     }
 
     J.CAM.update(dt, J.H);
     J.FX.update(dt);
-    J.UI.updateHUD();
+    if (J.Slash) J.Slash.update(dt, t);
+    J._hudT = (J._hudT || 0) + dt;
+    if (J._hudT > 0.12) { J._hudT = 0; J.UI.updateHUD(); }
     if (J.T.waterMat) J.T.waterMat.uniforms.t.value = t;
 
     J.R.render(J.S, J.C);
 
+    // 阴影：限频（每 0.28s 且移动超过 3m 才重算），避免每帧重绘阴影贴图
+    if (!J._sv) J._sv = new THREE.Vector2(9e9, 9e9);
+    J._shadowT = (J._shadowT || 0) + dt;
+    J._sv.set(J.H.pos.x, J.H.pos.z);
+    if (J._shadowT > 0.3 && _shadowAnchorDist(J._sv) > 3) {
+      J._shadowT = 0;
+      J._sa = J._sa || new THREE.Vector2();
+      J._sa.copy(J._sv);
+      // 只有高画质且离玩家 34m 内的静态块才投影，阴影 pass 立刻瘦身
+      if (G.quality >= 2) {
+        var px = J.H.pos.x, pz = J.H.pos.z;
+        J.S.traverse(function (o) {
+          if (o.name === 'merged') {
+            var dx = o.position.x - px, dz = o.position.z - pz;
+            o.castShadow = (dx * dx + dz * dz) < 34 * 34;
+          }
+        });
+      }
+      J.R.shadowMap.needsUpdate = true;
+    }
+
     frames++; fpsT += dt;
     if (fpsT > 0.6) {
       var fps = frames / fpsT;
-      document.getElementById('fps').textContent = fps.toFixed(0) + ' fps · ' + J.R.info.render.calls + ' draw';
+      J._fpsEl = J._fpsEl || document.getElementById('fps');
+      if (J._fpsEl) J._fpsEl.textContent = fps.toFixed(0) + ' fps · ' + J.R.info.render.calls + ' draw';
+      G.autoQuality(fps);
       frames = 0; fpsT = 0;
     }
     if (Math.floor(t) % 6 === 0) J.PROG.save();
   }
+
+  /* ---------------- 画质档位 ---------------- */
+  G.quality = 2;                 // 0 低 / 1 中 / 2 高
+  G.setQuality = function (q, silent) {
+    G.quality = Math.max(0, Math.min(2, q));
+    var dpr = [0.8, 1.0, J.dprMax][G.quality];
+    J.dpr = dpr;
+    J.R.setPixelRatio(dpr);
+    var shadows = G.quality > 0;
+    J.R.shadowMap.enabled = shadows;
+    J.S.traverse(function (o) {
+      if (o.name === 'merged') { o.castShadow = G.quality === 2; o.receiveShadow = shadows; }
+    });
+    onResize();
+    if (!silent) J.UI.toast(['低画质（流畅优先）', '中画质', '高画质'][G.quality], 1500);
+    try { localStorage.setItem('wl_q', G.quality); } catch (e) { }
+  };
+  G.cycleQuality = function () { G.setQuality((G.quality + 1) % 3); };
+
+  var lowFps = 0, hiFps = 0;
+  G.autoQuality = function (fps) {
+    if (fps < 50) { lowFps++; hiFps = 0; } else if (fps > 58) { hiFps++; lowFps = 0; } else { lowFps = 0; hiFps = 0; }
+    if (lowFps >= 3) {
+      lowFps = 0;
+      if (J.dpr > 0.85) {
+        J.dpr = Math.max(0.8, J.dpr - 0.15);
+        J.R.setPixelRatio(J.dpr);
+        onResize();
+      }
+    } else if (hiFps >= 8 && J.dpr < J.dprMax) {
+      hiFps = 0;
+      J.dpr = Math.min(J.dprMax, J.dpr + 0.1);
+      J.R.setPixelRatio(J.dpr);
+      onResize();
+    }
+  };
 
   G.respawn = function () {
     var x = J.T.riverX(120) - 19, z = 120;

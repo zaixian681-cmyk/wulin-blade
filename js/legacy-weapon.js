@@ -454,9 +454,7 @@ J.Weapon = (function () {
     })();
 
     /* 光源 */
-    var light = new THREE.PointLight(0xa8b8ff, 0.55, 4.5, 2);
-    light.position.set(0.1, 0.9, 0.1);
-    root.add(light);
+    var light = { intensity: 0, color: { setHex: function () { } } };
 
     var obj = {
       root: root, parts: parts, blade: blade, bladeMat: bladeMat,

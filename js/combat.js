@@ -189,6 +189,12 @@ window.WL = window.WL || {};
       var res = H.resolveCollision(H.pos.x + fwd.x * c.lunge * 0.55, H.pos.z + fwd.z * c.lunge * 0.55);
       H.pos.x = res[0]; H.pos.z = res[1];
     }
+    // 旧版刀光：清空轨迹并按武器配色
+    if (J.Slash) {
+      J.Slash.begin();
+      if (H.weapon === 'dao') J.Slash.setColor(0xfff3e0, 0xffc177);
+      else J.Slash.setColor(0xeaf6ff, 0x7fc4ff);
+    }
     S.comboIdx = idx + 1;
     if (S.comboIdx >= w.combo.length) S.comboIdx = w.combo.length;  // 等待重置
     S.comboTimer = 0.9;
@@ -196,6 +202,15 @@ window.WL = window.WL || {};
   }
 
   /* ---------------- 主更新 ---------------- */
+  var _bp = null;
+  function bladeSample(active) {
+    if (!J.Slash) return;
+    if (!_bp) _bp = { root: new THREE.Vector3(), tip: new THREE.Vector3(), rootOuter: new THREE.Vector3(), tipOuter: new THREE.Vector3() };
+    var p = J.H.bladePoints && J.H.bladePoints(_bp);
+    if (!p) return;
+    if (active) J.Slash.push(p.root, p.tip, p.rootOuter, p.tipOuter);
+  }
+
   CB.update = function (dt) {
     var H = J.H;
     S.comboTimer = Math.max(0, S.comboTimer - dt);
@@ -232,6 +247,8 @@ window.WL = window.WL || {};
       } else if (a.t <= a.wind + a.act) {
         var t2 = (a.t - a.wind) / a.act;
         H.pose = a.c.pose(t2);
+        // 刀光轨迹
+        bladeSample(true);
         // 命中判定
         doHitCheck(a, t2);
       } else {

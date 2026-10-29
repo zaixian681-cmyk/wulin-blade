@@ -34,6 +34,7 @@ window.WL = window.WL || {};
       var t = e.changedTouches ? e.changedTouches[0] : e;
       center();
       activeId = t.identifier;
+      UI.touchActive = true;
       applyPoint(t.clientX, t.clientY);
     }
     function move(e) {
@@ -46,6 +47,7 @@ window.WL = window.WL || {};
     }
     function end(e) {
       activeId = null;
+      UI.touchActive = false;
       knob.style.transform = 'translate(0,0)';
       J.IN.move.x = 0; J.IN.move.y = 0; J.IN.run = false;
     }
@@ -53,6 +55,20 @@ window.WL = window.WL || {};
     stick.addEventListener('touchmove', move, { passive: false });
     stick.addEventListener('touchend', end);
     stick.addEventListener('touchcancel', end);
+    // 关键：手指滑出摇杆/被系统打断时，touchend 不一定派发到元素上
+    window.addEventListener('touchend', function (e) {
+      if (activeId === null) return;
+      var ts = e.changedTouches || [];
+      for (var i = 0; i < ts.length; i++) if (ts[i].identifier === activeId) { end(); return; }
+    }, { passive: true });
+    window.addEventListener('touchcancel', function () { if (activeId !== null) end(); }, { passive: true });
+    window.addEventListener('blur', function () { if (activeId !== null) end(); });
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden && activeId !== null) end();
+    });
+
+    // 兜底看门狗：标记是否还有手指按在摇杆上
+    UI.touchActive = false;
     // 鼠标调试
     var md = false;
     stick.addEventListener('mousedown', function (e) { md = true; var t = e; t.identifier = 1; start(e); });
@@ -91,6 +107,8 @@ window.WL = window.WL || {};
     bind('btnAtk', function () { J.CB.onAttackPressed(false); });
     bind('btnHeavy', function () { J.CB.onAttackPressed(true); });
     bind('btnDodge', function () { J.CB.onDodge(); });
+    var qb = el('qBtn');
+    if (qb) qb.addEventListener('click', function () { J.GAME.cycleQuality(); });
     var fb = el('flipBtn');
     if (fb) fb.addEventListener('click', function () { window.__flip && window.__flip(); });
     bind('btnBlock', function () { J.IN.block = true; }, function () { J.IN.block = false; });
@@ -134,28 +152,34 @@ window.WL = window.WL || {};
     };
   };
 
+  var C = null;
+  function cache() {
+    C = {
+      hp: el('hpFill'), st: el('stFill'), wn: el('weaponName'), wk: el('weaponKind'),
+      exec: el('btnExec'), bar: el('foeBar'), fname: el('foeName'), fhp: el('foeHp'), fbrk: el('foeBreak')
+    };
+  }
   UI.updateHUD = function () {
+    if (!C) cache();
     var H = J.H;
-    el('hpFill').style.width = Math.max(0, H.hp / H.hpMax * 100) + '%';
-    el('stFill').style.width = Math.max(0, H.stam / H.stamMax * 100) + '%';
-    el('weaponName').textContent = J.CB.DATA[H.weapon].label;
-    el('weaponKind').textContent = J.CB.DATA[H.weapon].name;
+    C.hp.style.width = Math.max(0, H.hp / H.hpMax * 100) + '%';
+    C.st.style.width = Math.max(0, H.stam / H.stamMax * 100) + '%';
+    C.wn.textContent = J.CB.DATA[H.weapon].label;
+    C.wk.textContent = J.CB.DATA[H.weapon].name;
     // 处决提示
     var tn = J.F.nearestTo(H.pos, 3.0);
     var canExec = tn && !tn.dead && tn.broken;
-    el('btnExec').classList.toggle('ready', !!canExec);
+    C.exec.classList.toggle('ready', !!canExec);
     // 目标血条
     var target = tn && !tn.dead ? tn : null;
-    var bar = el('foeBar');
     if (target) {
-      bar.classList.add('show');
-      el('foeName').textContent = target.def.name;
-      el('foeHp').style.width = (target.hp / target.hpMax * 100) + '%';
-      var bk = el('foeBreak');
-      bk.style.width = Math.min(100, target.break / target.breakMax * 100) + '%';
-      bk.classList.toggle('full', target.broken);
+      C.bar.classList.add('show');
+      C.fname.textContent = target.def.name;
+      C.fhp.style.width = (target.hp / target.hpMax * 100) + '%';
+      C.fbrk.style.width = Math.min(100, target.break / target.breakMax * 100) + '%';
+      C.fbrk.classList.toggle('full', target.broken);
     } else {
-      bar.classList.remove('show');
+      C.bar.classList.remove('show');
     }
   };
 })();

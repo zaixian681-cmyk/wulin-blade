@@ -133,6 +133,8 @@ window.WL = window.WL || {};
     H.mesh = build();
     // 合并人物静态网格，降低 draw call
     try { if (WL.optimizeHeroModel) WL.optimizeHeroModel(H.mesh); } catch (e) { }
+    // 人物只投影不接收，减少阴影采样
+    H.mesh.traverse(function (o) { if (o.isMesh) { o.castShadow = true; o.receiveShadow = false; } });
     scene.add(H.mesh);
     H.pos.set(x, J.T.heightAt(x, z), z);
     H.mesh.position.copy(H.pos);
@@ -271,6 +273,24 @@ window.WL = window.WL || {};
     H.weapon = w;
     if (H.weapons.dao) H.weapons.dao.visible = (w === 'dao');
     if (H.weapons.jian) H.weapons.jian.visible = (w === 'jian');
+  };
+
+  /* 取刀身根/尖的世界坐标（供刀光系统采样） */
+  var _v1 = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3();
+  H.bladePoints = function (out) {
+    var w = H.weapons[H.weapon];
+    if (!w || !w.visible) return null;
+    w.updateMatrixWorld(true);
+    // 刀身沿本地 +Y
+    _v1.set(0, 0.18, 0).applyMatrix4(w.matrixWorld);
+    _v2.set(0, 1.32, 0).applyMatrix4(w.matrixWorld);
+    // 外扩（用于外焰层）
+    _v3.copy(_v2).sub(_v1).normalize();
+    out.root.copy(_v1);
+    out.tip.copy(_v2);
+    out.tipOuter.copy(_v2).addScaledVector(_v3, 0.10);
+    out.rootOuter.copy(_v1).addScaledVector(_v3, -0.04);
+    return out;
   };
 
   H.hurt = function (dmg) {

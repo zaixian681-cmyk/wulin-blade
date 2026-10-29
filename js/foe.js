@@ -96,6 +96,7 @@ window.WL = window.WL || {};
       model: m, dead: false, broken: false, executed: false,
       phase: J.rand(0, 6.28), hitFlash: 0
     };
+    if (J.mergePerJoint) J.mergePerJoint(m.group);
     m.group.position.copy(f.pos);
     scene.add(m.group);
     f.hit = function (dmg, opt) { F.hitFoe(f, dmg, opt); };
