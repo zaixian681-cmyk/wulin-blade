@@ -127,9 +127,9 @@ window.WL = window.WL || {};
     S.dodgeT = 0.42;
     S.iframe = 0.3;
     var m = J.IN.move;
-    var len = Math.hypot(m.x, m.y);
-    if (len < 0.15) { S.dodgeDir.set(Math.sin(H.yaw), 0, Math.cos(H.yaw)); }
-    else { S.dodgeDir.set(m.x / len, 0, m.y / len); }
+    var dxm = m.x;
+    if (Math.abs(dxm) < 0.15) dxm = -H.face;   // 原地闪避：向后撤
+    S.dodgeDir.set(dxm > 0 ? 1 : -1, 0, 0);
     return true;
   };
 
@@ -146,14 +146,15 @@ window.WL = window.WL || {};
     var target = null, best = 1e9;
     (J.F.list || []).forEach(function (f) {
       if (f.dead || !f.broken) return;
-      var d = Math.hypot(f.pos.x - H.pos.x, f.pos.z - H.pos.z);
-      if (d < 3.0 && d < best) { best = d; target = f; }
+      var d = Math.abs(f.pos.x - H.pos.x);
+      if (d < 3.2 && d < best) { best = d; target = f; }
     });
     if (!target) return false;
     S.execTarget = target;
     S.execT = 0;
     H.state = 'exec';
-    H.yaw = Math.atan2(target.pos.x - H.pos.x, target.pos.z - H.pos.z);
+    H.face = target.pos.x > H.pos.x ? 1 : -1;
+    H.yaw = H.face > 0 ? Math.PI / 2 : -Math.PI / 2;
     target.executed = true;
     return true;
   };
@@ -162,12 +163,12 @@ window.WL = window.WL || {};
   function startAttack(heavy) {
     var H = J.H;
     var w = DATA[H.weapon];
-    // 软锁定：攻击瞬间自动朝向最近的目标
-    var tgt = J.F.nearestTo(H.pos, w.reach + 1.6);
+    // 横版软锁定：朝最近目标转身
+    var tgt = J.F.nearestTo(H.pos, w.reach + 2.2);
     if (tgt) {
-      var ang = Math.atan2(tgt.pos.x - H.pos.x, tgt.pos.z - H.pos.z);
-      var diff = ((ang - H.yaw + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
-      if (Math.abs(diff) < 1.15) H.yaw += diff;
+      var dx = tgt.pos.x - H.pos.x;
+      if (Math.abs(dx) > 0.15) H.face = dx > 0 ? 1 : -1;
+      H.yaw = H.face > 0 ? Math.PI / 2 : -Math.PI / 2;
     }
     if (H.stam < w.stamCost) { CB.fx.text('力竭', H.pos, '#ff9a9a'); return; }
     H.stam -= w.stamCost;
@@ -185,9 +186,7 @@ window.WL = window.WL || {};
     H.state = 'attack';
     // 突进
     if (c.lunge) {
-      var fwd = new THREE.Vector3(Math.sin(H.yaw), 0, Math.cos(H.yaw));
-      var res = H.resolveCollision(H.pos.x + fwd.x * c.lunge * 0.55, H.pos.z + fwd.z * c.lunge * 0.55);
-      H.pos.x = res[0]; H.pos.z = res[1];
+      H.pos.x = Math.max(J.ST.X0 + 3, Math.min(J.ST.X1 - 3, H.pos.x + c.lunge * 0.55 * H.face));
     }
     S.comboIdx = idx + 1;
     if (S.comboIdx >= w.combo.length) S.comboIdx = w.combo.length;  // 等待重置
@@ -255,10 +254,9 @@ window.WL = window.WL || {};
     /* 闪避 */
     if (H.state === 'dodge') {
       S.dodgeT -= dt;
-      var sp = 9.5 * Math.max(0, S.dodgeT / 0.42);
-      var res = H.resolveCollision(H.pos.x + S.dodgeDir.x * sp * dt, H.pos.z + S.dodgeDir.z * sp * dt);
-      H.pos.x = res[0]; H.pos.z = res[1];
-      H.mesh.rotation.z = -S.dodgeDir.x * 0.25;
+      var sp = 10.5 * Math.max(0, S.dodgeT / 0.42);
+      H.pos.x = Math.max(J.ST.X0 + 3, Math.min(J.ST.X1 - 3, H.pos.x + S.dodgeDir.x * sp * dt));
+      H.mesh.rotation.z = -S.dodgeDir.x * 0.22;
       if (S.dodgeT <= 0) { H.mesh.rotation.z = 0; H.state = 'idle'; }
     }
 
@@ -267,8 +265,8 @@ window.WL = window.WL || {};
       S.execT += dt;
       var tg = S.execTarget;
       if (tg && S.execT < 0.45) {
-        var dx = tg.pos.x - H.pos.x, dz = tg.pos.z - H.pos.z;
-        H.pos.x += dx * dt * 6; H.pos.z += dz * dt * 6;
+        var dxe = tg.pos.x - H.pos.x;
+        H.pos.x += dxe * Math.min(1, dt * 7);
       }
       H.pose = {
         armR: [-1.7 + S.execT * 3.4, -0.1, 0], elbowR: -0.4,
@@ -308,16 +306,15 @@ window.WL = window.WL || {};
     if (a.didHit && t < 0.85) return;
     var H = J.H;
     var w = a.w;
-    var fx = Math.sin(H.yaw), fz = Math.cos(H.yaw);
     var hitAny = false;
     (J.F.list || []).forEach(function (f) {
       if (f.dead || a.hitSet[f.id]) return;
-      var dx = f.pos.x - H.pos.x, dz = f.pos.z - H.pos.z;
-      var dist = Math.hypot(dx, dz);
-      if (dist > w.reach + (f.radius || 0.45) + 0.35) return;
-      var ang = Math.atan2(dx, dz);
-      var diff = Math.abs(((ang - H.yaw + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
-      if (diff > w.arc) return;
+      var dx = f.pos.x - H.pos.x;
+      var dy = Math.abs(f.pos.y - H.pos.y);
+      var adx = Math.abs(dx);
+      if (dy > 1.9) return;                       // 高低差太大
+      if (adx > w.reach + (f.radius || 0.45) + 0.35) return;
+      if (dx * H.face < -0.7) return;             // 在背后
       a.hitSet[f.id] = true;
       hitAny = true;
       var isCrit = Math.random() < w.crit;
@@ -375,9 +372,8 @@ window.WL = window.WL || {};
     J.CAM.shake(isHeavy ? 0.28 : 0.14);
     CB.fx.text('-' + Math.round(dmg), H.pos, '#ff8080');
     // 击退
-    var dx = H.pos.x - fromPos.x, dz = H.pos.z - fromPos.z;
-    var l = Math.hypot(dx, dz) || 1;
-    var res = H.resolveCollision(H.pos.x + dx / l * 0.5, H.pos.z + dz / l * 0.5);
-    H.pos.x = res[0]; H.pos.z = res[1];
+    var dx2 = H.pos.x - fromPos.x;
+    var l2 = Math.abs(dx2) || 1;
+    H.pos.x = Math.max(J.ST.X0 + 3, Math.min(J.ST.X1 - 3, H.pos.x + (dx2 / l2) * 0.45));
   };
 })();

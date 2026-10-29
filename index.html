@@ -37,7 +37,7 @@
   #fps{position:absolute;right:12px;top:12px;font-size:10px;color:rgba(255,255,255,.45);font-variant-numeric:tabular-nums}
 
   /* ---------- 摇杆 ---------- */
-  #stick{position:fixed;left:22px;bottom:26px;width:132px;height:132px;border-radius:50%;
+  #stick{position:fixed;left:22px;bottom:250px;width:112px;height:112px;border-radius:50%;
     background:radial-gradient(circle,rgba(255,255,255,.09),rgba(255,255,255,.03));
     box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.18);z-index:20;touch-action:none}
   #knob{position:absolute;left:50%;top:50%;width:58px;height:58px;margin:-29px 0 0 -29px;border-radius:50%;
@@ -58,8 +58,10 @@
   #btnSwap{right:22px;bottom:214px;width:58px;height:58px;font-size:12px}
   #btnExec{right:206px;bottom:40px;width:62px;height:62px;font-size:12px;opacity:.45}
   #btnExec.ready{opacity:1;box-shadow:inset 0 0 0 2px #ffd166,0 0 16px rgba(255,209,102,.55)}
-  #btnJam{right:206px;bottom:118px;width:52px;height:52px;font-size:12px;opacity:.5}
-  #btnUse{right:206px;bottom:118px}
+
+  #btnLeft{left:26px;bottom:150px;width:66px;height:66px;font-size:20px}
+  #btnRight{left:104px;bottom:150px;width:66px;height:66px;font-size:20px}
+  #btnJump{left:64px;bottom:62px;width:70px;height:70px}
 
   /* ---------- 对话框 / 提示 ---------- */
   #toast{position:fixed;left:50%;top:19%;transform:translate(-50%,-6px);padding:9px 18px;
@@ -99,13 +101,16 @@
 </div>
 
 <div id="stick"><div id="knob"></div></div>
+<div class="btn" id="btnLeft">◀</div>
+<div class="btn" id="btnRight">▶</div>
+<div class="btn" id="btnJump">跳</div>
 <div class="btn" id="btnAtk">斩</div>
 <div class="btn" id="btnHeavy">重</div>
 <div class="btn" id="btnDodge">闪</div>
 <div class="btn" id="btnBlock">御</div>
 <div class="btn" id="btnSwap">换兵</div>
 <div class="btn" id="btnExec">处决</div>
-<div class="btn" id="btnJam">跳</div>
+
 
 <div id="toast"></div>
 <div id="dialog">
@@ -117,17 +122,18 @@
 <div id="hint">江湖初入……</div>
 
 <script src="js/three.min.js"></script>
-<script src="js/textures.js?v=21"></script>
-<script src="js/core.js?v=10"></script>
-<script src="js/terrain.js?v=21"></script>
-<script src="js/arch.js?v=4"></script>
-<script src="js/town.js?v=19"></script>
-<script src="js/hero.js?v=2"></script>
-<script src="js/fx.js?v=13"></script>
-<script src="js/combat.js?v=16"></script>
-<script src="js/foe.js?v=2"></script>
-<script src="js/ui.js?v=2"></script>
-<script src="js/merge.js?v=4"></script>
-<script src="js/game.js?v=17"></script>
+<script src="js/textures.js?v=49"></script>
+<script src="js/core.js?v=49"></script>
+<script src="js/arch.js?v=49"></script>
+<script src="js/stage.js?v=49"></script>
+<!-- stage -->
+
+<script src="js/hero.js?v=49"></script>
+<script src="js/fx.js?v=49"></script>
+<script src="js/combat.js?v=49"></script>
+<script src="js/foe.js?v=49"></script>
+<script src="js/ui.js?v=49"></script>
+<script src="js/merge.js?v=49"></script>
+<script src="js/game.js?v=49"></script>
 </body>
 </html>

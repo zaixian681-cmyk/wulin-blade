@@ -86,8 +86,8 @@ window.WL = window.WL || {};
     var m = buildModel(t);
     var f = {
       id: ++F.idSeq, type: typeName, def: t,
-      pos: new THREE.Vector3(x, J.T.heightAt(x, z), z),
-      home: new THREE.Vector3(x, J.T.heightAt(x, z), z),
+      pos: new THREE.Vector3(x, J.ST.groundY(x), 0),
+      home: new THREE.Vector3(x, J.ST.groundY(x), 0),
       yaw: J.rand(0, 6.28),
       hp: t.hp, hpMax: t.hp,
       break: 0, breakMax: t.breakMax,
@@ -126,21 +126,17 @@ window.WL = window.WL || {};
 
   function updateOne(f, dt, P) {
     if (f.dead) {
-      f.model.group.rotation.z = J.damp(f.model.group.rotation.z, 1.45, 6, dt);
+      f.model.group.rotation.z = J.damp(f.model.group.rotation.z, 1.45 * (f.deadDir || 1), 6, dt);
       f.model.group.position.y = J.damp(f.model.group.position.y, f.pos.y - 0.1, 6, dt);
       if (f.removeTimer === undefined) f.removeTimer = f.executed ? 4 : 5;
       return;
     }
-    var dx = P.pos.x - f.pos.x, dz = P.pos.z - f.pos.z;
-    var dist = Math.hypot(dx, dz);
+    var dx = P.pos.x - f.pos.x, dz = 0;
+    var dist = Math.abs(dx);
+    var face = dx >= 0 ? 1 : -1;
     var t = f.def;
     f.t += dt;
     f.hitFlash = Math.max(0, f.hitFlash - dt * 4);
-
-    // 朝向
-    var wantYaw = Math.atan2(dx, dz);
-    var diff = ((wantYaw - f.yaw + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
-
     if (f.state === 'stagger') {
       f.t2 = (f.t2 || 0) - dt;
       f.model.group.rotation.x = Math.sin(f.t2 * 20) * 0.05;
@@ -179,9 +175,7 @@ window.WL = window.WL || {};
         f.telegraph = 0;
         if (!f.didHit && k2 > 0.35) {
           f.didHit = true;
-          var ang = Math.atan2(P.pos.x - f.pos.x, P.pos.z - f.pos.z);
-          var ad = Math.abs(((ang - f.yaw + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
-          if (dist < t.reach + 0.5 && ad < t.arc) {
+          if (dist < t.reach + 0.5 && (P.pos.x - f.pos.x) * face > -0.5 && Math.abs(P.pos.y - f.pos.y) < 1.9) {
             J.CB.playerHit(t.dmg, f.pos, false);
           }
           J.FX.swipe(f.pos, f.yaw);
@@ -202,13 +196,10 @@ window.WL = window.WL || {};
     // 追击 / 巡逻
     if (dist < t.aggro) {
       f.state = 'chase';
-      f.yaw += diff * Math.min(1, dt * 6);
+      f.yaw = face > 0 ? Math.PI / 2 : -Math.PI / 2;
       if (dist > t.reach * 0.85) {
         var sp = t.speed * (dist > 6 ? 1 : 0.7);
-        var nx = f.pos.x + (dx / dist) * sp * dt;
-        var nz = f.pos.z + (dz / dist) * sp * dt;
-        var res = J.H.resolveCollision(nx, nz);
-        f.pos.x = res[0]; f.pos.z = res[1];
+        f.pos.x += face * sp * dt;
         // 走路动画
         f.phase += dt * 8;
         f.model.legR.rotation.x = Math.sin(f.phase) * 0.5;
@@ -227,17 +218,14 @@ window.WL = window.WL || {};
     } else {
       // 巡逻回到原位
       f.state = 'idle';
-      var hx = f.home.x - f.pos.x, hz = f.home.z - f.pos.z;
-      var hd = Math.hypot(hx, hz);
-      if (hd > 3) {
-        f.pos.x += hx / hd * 1.4 * dt;
-        f.pos.z += hz / hd * 1.4 * dt;
-      }
+      var hx = f.home.x - f.pos.x;
+      var hd = Math.abs(hx);
+      if (hd > 2) { f.pos.x += (hx / hd) * 1.4 * dt; f.yaw = hx > 0 ? Math.PI / 2 : -Math.PI / 2; }
       f.phase += dt * 1.5;
     }
 
-    f.pos.y = J.T.heightAt(f.pos.x, f.pos.z);
-    f.model.group.position.set(f.pos.x, f.pos.y, f.pos.z);
+    f.pos.y = J.ST.groundY(f.pos.x);
+    f.model.group.position.set(f.pos.x, f.pos.y, 0);
     f.model.group.rotation.y = f.yaw;
 
     // 受击闪白
@@ -290,7 +278,7 @@ window.WL = window.WL || {};
     for (var i = 0; i < F.list.length; i++) {
       var f = F.list[i];
       if (f.dead) continue;
-      var d = Math.hypot(f.pos.x - pos.x, f.pos.z - pos.z);
+      var d = Math.abs(f.pos.x - pos.x);
       if (d < bd) { bd = d; best = f; }
     }
     return best;

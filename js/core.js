@@ -50,9 +50,9 @@ window.WL = window.WL || {};
       new THREE.ShaderMaterial({
         side: THREE.BackSide, depthWrite: false, fog: false,
         uniforms: {
-          cTop: { value: new THREE.Color(0x5d86a8) },
-          cMid: { value: new THREE.Color(0xa9c2cf) },
-          cHor: { value: new THREE.Color(0xe2ddcd) },
+          cTop: { value: new THREE.Color(0x4f7fa6) },
+          cMid: { value: new THREE.Color(0x9dbcce) },
+          cHor: { value: new THREE.Color(0xe8dcc0) },
           sunDir: { value: new THREE.Vector3(-0.42, 0.42, -0.8).normalize() },
           cSun: { value: new THREE.Color(0xfff2d6) }
         },
