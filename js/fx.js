@@ -192,25 +192,57 @@ window.WL = window.WL || {};
   CAM.shake = function (a) { CAM.shakeAmt = Math.min(0.7, CAM.shakeAmt + a); };
 
   CAM.update = function (dt, hero) {
-    var face = hero.face || 1;
-    // 横版：镜头在 +Z 侧，跟随主角，朝向前方留出视野
-    var targetX = hero.pos.x + face * 2.6;
-    var targetY = hero.pos.y + 2.3 + (hero.vy > 0 ? 0.3 : 0);
+    var targetYaw = J.IN.camYaw;
+    CAM.yaw = J.lerp(CAM.yaw, targetYaw, Math.min(1, dt * 8));
+    CAM.pitch = J.clamp(J.lerp(CAM.pitch, J.IN.camPitch, Math.min(1, dt * 8)), -0.35, 1.05);
 
-    CAM.pos.x = J.damp(CAM.pos.x || targetX, targetX, 6, dt);
-    CAM.pos.y = J.damp(CAM.pos.y || targetY, targetY, 6, dt);
-    CAM.pos.z = J.ST.CAM_Z;
+    var focus = new THREE.Vector3(hero.pos.x, hero.pos.y + 1.5, hero.pos.z);
+    var cp = Math.cos(CAM.pitch), sp = Math.sin(CAM.pitch);
+    var off = new THREE.Vector3(
+      -Math.sin(CAM.yaw) * cp * CAM.dist,
+      sp * CAM.dist + 0.4,
+      -Math.cos(CAM.yaw) * cp * CAM.dist
+    );
+    var want = focus.clone().add(off);
+
+    // 视线遮挡：地形 + 建筑
+    var dir = want.clone().sub(focus);
+    var len = dir.length(); dir.normalize();
+    var dist = CAM.dist;
+    for (var s = 0.25; s <= 1.0; s += 0.06) {
+      var p = focus.clone().addScaledVector(dir, len * s);
+      var h = J.T.heightAt(p.x, p.z) + 0.55;
+      var blocked = p.y < h;
+      if (!blocked && J.W.colliders) {
+        var cs = J.W.colliders;
+        for (var ci = 0; ci < cs.length; ci++) {
+          var c = cs[ci];
+          if (p.y < 3.4 && Math.abs(p.x - c.x) < c.hw + 0.35 && Math.abs(p.z - c.z) < c.hd + 0.35) { blocked = true; break; }
+        }
+      }
+      if (blocked) { dist = Math.max(1.9, len * s - 0.5); break; }
+    }
+    want = focus.clone().addScaledVector(dir, dist);
+
+    var hGround = J.T.heightAt(want.x, want.z) + 0.75;
+    if (want.y < hGround) want.y = hGround;
+
+    CAM.pos.x = J.damp(CAM.pos.x || want.x, want.x, 12, dt);
+    CAM.pos.y = J.damp(CAM.pos.y || want.y, want.y, 12, dt);
+    CAM.pos.z = J.damp(CAM.pos.z || want.z, want.z, 12, dt);
 
     var cam = J.C;
-    cam.position.set(CAM.pos.x, CAM.pos.y, CAM.pos.z);
+    cam.position.copy(CAM.pos);
     if (CAM.shakeAmt > 0.001) {
       cam.position.x += J.rand(-1, 1) * CAM.shakeAmt * 0.35;
-      cam.position.y += J.rand(-1, 1) * CAM.shakeAmt * 0.3;
+      cam.position.y += J.rand(-1, 1) * CAM.shakeAmt * 0.35;
+      cam.position.z += J.rand(-1, 1) * CAM.shakeAmt * 0.35;
       CAM.shakeAmt *= Math.pow(0.0025, dt);
       if (CAM.shakeAmt < 0.002) CAM.shakeAmt = 0;
     }
-    cam.lookAt(CAM.pos.x, hero.pos.y + 1.95, 0);
+    cam.lookAt(focus.x, focus.y + 0.35, focus.z);
 
-    J.updateShadow(hero.pos.x, 0);
+    // 阴影跟随
+    J.updateShadow(hero.pos.x, hero.pos.z);
   };
 })();

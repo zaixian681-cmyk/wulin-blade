@@ -28,9 +28,9 @@ window.WL = window.WL || {};
         var d = Math.hypot(dx, dy);
         var k = d > R ? R / d : 1;
         knob.style.transform = 'translate(' + (dx * k) + 'px,' + (dy * k) + 'px)';
-        var nx = (dx * k) / R;
-        J.IN.move.x = nx; J.IN.move.y = 0;
-        J.IN.run = Math.abs(nx) > 0.65;
+        var nx = (dx * k) / R, ny = (dy * k) / R;
+        J.IN.move.x = nx; J.IN.move.y = ny;
+        J.IN.run = Math.hypot(nx, ny) > 0.72;
       }
       e.preventDefault();
     }
@@ -83,9 +83,7 @@ window.WL = window.WL || {};
     bind('btnBlock', function () { J.IN.block = true; }, function () { J.IN.block = false; });
     bind('btnSwap', function () { J.CB.onSwap(); });
     bind('btnExec', function () { J.CB.tryExecute(); });
-    bind('btnLeft', function () { J.IN.move.x = -1; J.IN.run = true; }, function () { J.IN.move.x = 0; J.IN.run = false; });
-    bind('btnRight', function () { J.IN.move.x = 1; J.IN.run = true; }, function () { J.IN.move.x = 0; J.IN.run = false; });
-    bind('btnJump', function () { J.H.jump(); });
+    bind('btnJam', function () { /* 跳跃：Phase 2 */ });
 
     // 键盘（桌面调试）
     window.addEventListener('keydown', function (e) {
@@ -166,8 +164,8 @@ window.WL = window.WL || {};
     head.position.y = 1.32; g.add(head);
     var hair = new THREE.Mesh(new THREE.SphereGeometry(0.145, 10, 8), new THREE.MeshStandardMaterial({ color: 0x141216, roughness: 0.7 }));
     hair.position.set(0, 1.34, -0.01); g.add(hair);
-    var y = J.ST.groundY(x);
-    g.position.set(x, y, 0);
+    var y = J.T.heightAt(x, z);
+    g.position.set(x, y, z);
     var npc = { group: g, x: x, z: z, name: name, yaw: J.rand(0, 6.28) };
     g.rotation.y = npc.yaw;
     J.S.add(g);
@@ -176,9 +174,9 @@ window.WL = window.WL || {};
   }
 
   N.build = function () {
-    J.ST.npcSpawns.forEach(function (s) {
+    J.W.npcSpots.forEach(function (s) {
       var colors = { innkeeper: 0x8a6a4a, tea: 0x6a7a5a, smith: 0x44373a, villager: 0x7a6a56, vendor: 0x6a5470 };
-      makeNPC(s.x, 0, colors[s.role] || 0x7a6a56, s.name);
+      makeNPC(s.x, s.z, colors[s.role] || 0x7a6a56, s.name);
     });
   };
 
@@ -186,7 +184,7 @@ window.WL = window.WL || {};
     var best = null, bd = maxD || 3;
     for (var i = 0; i < N.list.length; i++) {
       var n = N.list[i];
-      var d = Math.abs(n.x - pos.x);
+      var d = Math.hypot(n.x - pos.x, n.z - pos.z);
       if (d < bd) { bd = d; best = n; }
     }
     return best;

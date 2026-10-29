@@ -97,10 +97,14 @@ window.WL = window.WL || {};
 
     /* ---- 主街：西岸 ---- */
     var westX = function (z) { return T.riverX(z) - 19; };
-    ribbon(scene, westX, 10.5, streetMat, 0.05, -132, 150, 2.5);
+    ribbon(scene, westX, 9.0, streetMat, 0.05, -132, 150, 2.5);
     /* ---- 主街：东岸 ---- */
     var eastX = function (z) { return T.riverX(z) + 19; };
-    ribbon(scene, eastX, 10.0, streetMat, 0.05, -110, 140, 2.5);
+    ribbon(scene, eastX, 8.5, streetMat, 0.05, -110, 140, 2.5);
+
+    /* ---- 建筑前铺地（与街面同高，消除草地接缝） ---- */
+    ribbon(scene, function (z) { return T.riverX(z) - 34; }, 7.5, streetMat, 0.05, -132, 150, 2.5);
+    ribbon(scene, function (z) { return T.riverX(z) + 34; }, 7.0, streetMat, 0.05, -110, 140, 2.5);
 
     /* ---- 河岸步道 ---- */
     ribbon(scene, function (z) { return T.riverX(z) - 12.6; }, 1.5, streetMat, 0.04, -120, 140, 3);
@@ -135,7 +139,7 @@ window.WL = window.WL || {};
       { z: -108, w: 10, d: 8, f: 2, style: 'house' }
     ];
     rowW.forEach(function (b) {
-      var x = T.riverX(b.z) - 28;
+      var x = T.riverX(b.z) - 34;
       var cfg = { w: b.w, d: b.d, h: 3.5, floors: b.f, style: b.style, open: !!b.open, label: b.label, plaque: b.plaque, lanterns: b.lanterns === undefined ? (b.open ? 2 : 1) : b.lanterns, redRoof: !!b.redRoof };
       var res = A.building(cfg);
       place(scene, res, x, b.z, Math.PI / 2, 'shop', b.open);
@@ -156,7 +160,7 @@ window.WL = window.WL || {};
       { z: -84, w: 12, d: 9, f: 2, style: 'house' }
     ];
     rowE.forEach(function (b) {
-      var x = T.riverX(b.z) + 28;
+      var x = T.riverX(b.z) + 34;
       var cfg = { w: b.w, d: b.d, h: 3.5, floors: b.f, style: b.style, open: !!b.open, label: b.label, plaque: b.plaque, lanterns: b.open ? 2 : 1 };
       var res = A.building(cfg);
       place(scene, res, x, b.z, -Math.PI / 2, 'shop', b.open);
@@ -229,8 +233,8 @@ window.WL = window.WL || {};
     bambooGeo.translate(0, 3.75, 0);
     var bambooMat = new THREE.MeshStandardMaterial({ color: 0x6d8a3e, roughness: 0.8, metalness: 0 });
     var leafMat = new THREE.MeshStandardMaterial({ map: TX.tLeaf, transparent: true, depthWrite: false, side: THREE.DoubleSide, roughness: 0.9, color: 0x9fbf7a });
-    var pineGeo = new THREE.ConeGeometry(1.9, 5.2, 7, 1);
-    pineGeo.translate(0, 4.6, 0);
+    var pineGeo = new THREE.ConeGeometry(1.5, 4.4, 7, 1);
+    pineGeo.translate(0, 4.0, 0);
     var pineMat = new THREE.MeshStandardMaterial({ color: 0x2f4a2c, roughness: 1, flatShading: true });
     var trunkGeo = new THREE.CylinderGeometry(0.16, 0.3, 3.4, 5);
     trunkGeo.translate(0, 1.7, 0);
@@ -249,8 +253,8 @@ window.WL = window.WL || {};
       if (h < 0.4) continue;
       var dens = T.fbm(x * 0.02, z * 0.02, 3);
       var isBamboo = dens > 0.5;
-      if (isBamboo && bambooPos.length < 900) bambooPos.push([x, h, z, J.rand(0.8, 1.5)]);
-      else if (!isBamboo && pinePos.length < 420) pinePos.push([x, h, z, J.rand(0.7, 1.5)]);
+      if (isBamboo && bambooPos.length < 900) bambooPos.push([x, h, z, J.rand(0.7, 1.15)]);
+      else if (!isBamboo && pinePos.length < 420) pinePos.push([x, h, z, J.rand(0.7, 1.15)]);
     }
     function inst(geo, mat, arr, withTrunk) {
       var im = new THREE.InstancedMesh(geo, mat, arr.length);

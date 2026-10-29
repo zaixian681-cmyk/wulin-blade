@@ -6,11 +6,7 @@ window.WL = window.WL || {};
   var J = WL;
   var H = J.H = {};
 
-  H.pos = new THREE.Vector3(-78, 0, 0);
-  H.face = 1;              // 1 朝右, -1 朝左
-  H.vy = 0;
-  H.onGround = true;
-  H.jumpVel = 7.4;
+  H.pos = new THREE.Vector3(0, 0, 120);
   H.vel = new THREE.Vector3();
   H.yaw = Math.PI;
   H.hp = 260; H.hpMax = 260;
@@ -217,59 +213,68 @@ window.WL = window.WL || {};
   H.spawn = function (scene, x, z) {
     H.mesh = build();
     scene.add(H.mesh);
-    H.pos.set(x, J.ST.groundY(x), 0);
+    H.pos.set(x, J.T.heightAt(x, z), z);
     H.mesh.position.copy(H.pos);
     H.mesh.rotation.y = H.yaw;
     return H.mesh;
   };
 
-  /* ---------------- 移动（横版） ---------------- */
-  function clampX(x) {
-    return Math.max(J.ST.X0 + 3, Math.min(J.ST.X1 - 3, x));
-  }
-  H.resolveCollision = function (nx, nz) { return [clampX(nx), 0]; };
-
-  H.snapGround = function () {
-    var gy = J.ST.groundY(H.pos.x);
-    if (H.onGround) {
-      H.pos.y = J.damp(H.pos.y, gy, 22, 1 / 60);
-      if (Math.abs(H.pos.y - gy) < 0.02) H.pos.y = gy;
+  /* ---------------- 移动与碰撞 ---------------- */
+  function resolveCollision(nx, nz) {
+    var r = H.radius;
+    var cs = J.W.colliders;
+    for (var i = 0; i < cs.length; i++) {
+      var c = cs[i];
+      var minx = c.x - c.hw - r, maxx = c.x + c.hw + r;
+      var minz = c.z - c.hd - r, maxz = c.z + c.hd + r;
+      if (nx > minx && nx < maxx && nz > minz && nz < maxz) {
+        // 推向最近的一边
+        var dl = nx - minx, dr = maxx - nx, dn = nz - minz, df = maxz - nz;
+        var m = Math.min(dl, dr, dn, df);
+        if (m === dl) nx = minx;
+        else if (m === dr) nx = maxx;
+        else if (m === dn) nz = minz;
+        else nz = maxz;
+      }
     }
-    H.pos.z = 0;
-    return gy;
-  };
+    return [nx, nz];
+  }
+  H.resolveCollision = resolveCollision;
 
-  H.jump = function () {
-    if (!H.onGround) return false;
-    H.vy = H.jumpVel;
-    H.onGround = false;
-    return true;
+  /* 地形贴地 */
+  H.snapGround = function () {
+    var h = J.T.heightAt(H.pos.x, H.pos.z);
+    // 桥面
+    for (var i = 0; i < J.W.bridges.length; i++) {
+      var b = J.W.bridges[i];
+      var dx = Math.abs(H.pos.x - b.x), dz = Math.abs(H.pos.z - b.z);
+      if (dx < b.len / 2 && dz < b.w / 2 + 0.4) {
+        var t = 1 - (dx / (b.len / 2));
+        var by = b.y + Math.sin(Math.max(0, Math.min(1, t)) * Math.PI) * b.rise + 0.06;
+        h = Math.max(h, by);
+      }
+    }
+    H.pos.y = J.damp(H.pos.y, h, 18, 1 / 60);
+    if (Math.abs(H.pos.y - h) > 4) H.pos.y = h;
+    return h;
   };
 
   H.move = function (dt, dirX, dirY, running) {
     var sp = running ? H.speedRun : H.speedWalk;
-    if (Math.abs(dirX) > 0.08) {
-      H.pos.x = clampX(H.pos.x + dirX * sp * dt);
-      H.face = dirX > 0 ? 1 : -1;
-      H.speedNow = sp * Math.abs(dirX);
-    } else {
-      H.speedNow = 0;
+    var len = Math.hypot(dirX, dirY);
+    if (len > 1) { dirX /= len; dirY /= len; len = 1; }
+    if (len > 0.05) {
+      var nx = H.pos.x + dirX * sp * dt;
+      var nz = H.pos.z + dirY * sp * dt;
+      var res = resolveCollision(nx, nz);
+      H.pos.x = res[0]; H.pos.z = res[1];
+      // 朝向：平滑转向移动方向
+      var target = Math.atan2(dirX, dirY);
+      var diff = ((target - H.yaw + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
+      H.yaw += diff * Math.min(1, dt * 14);
     }
-    H.yaw = H.face > 0 ? Math.PI / 2 : -Math.PI / 2;
-    return Math.abs(dirX);
-  };
-
-  /* 重力与落地 */
-  H.physics = function (dt) {
-    var gy = J.ST.groundY(H.pos.x);
-    if (!H.onGround) {
-      H.vy -= 21 * dt;
-      H.pos.y += H.vy * dt;
-      if (H.pos.y <= gy) { H.pos.y = gy; H.vy = 0; H.onGround = true; H.landT = 0.12; }
-    } else {
-      H.pos.y = gy;
-    }
-    H.landT = Math.max(0, (H.landT || 0) - dt);
+    H.speedNow = sp * len;
+    return len;
   };
 
   /* ---------------- 程序化动画 ---------------- */

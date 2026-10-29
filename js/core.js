@@ -50,9 +50,9 @@ window.WL = window.WL || {};
       new THREE.ShaderMaterial({
         side: THREE.BackSide, depthWrite: false, fog: false,
         uniforms: {
-          cTop: { value: new THREE.Color(0x4f7fa6) },
-          cMid: { value: new THREE.Color(0x9dbcce) },
-          cHor: { value: new THREE.Color(0xe8dcc0) },
+          cTop: { value: new THREE.Color(0x5d86a8) },
+          cMid: { value: new THREE.Color(0xa9c2cf) },
+          cHor: { value: new THREE.Color(0xe2ddcd) },
           sunDir: { value: new THREE.Vector3(-0.42, 0.42, -0.8).normalize() },
           cSun: { value: new THREE.Color(0xfff2d6) }
         },
@@ -87,7 +87,7 @@ window.WL = window.WL || {};
     sc.add(sun); sc.add(sun.target);
     J.sun = sun;
 
-    sc.add(new THREE.HemisphereLight(0xbcd6e8, 0x6b6350, 1.15));
+    sc.add(new THREE.HemisphereLight(0xc6dcec, 0x7a7260, 1.45));
     var fill = new THREE.DirectionalLight(0x9cc0dc, 0.65);
     fill.position.set(160, 90, 200);
     sc.add(fill);

@@ -14,7 +14,7 @@ window.WL = window.WL || {};
     gold: 0,
     save: function () {
       try {
-        localStorage.setItem('wl_save_v2', JSON.stringify({
+        localStorage.setItem('wl_save_v3', JSON.stringify({
           x: J.H.pos.x, z: J.H.pos.z, yaw: J.H.yaw,
           weapon: J.H.weapon, hp: J.H.hp, kills: J.PROG.kills,
           quest: J.PROG.quest, gold: J.PROG.gold
@@ -23,7 +23,7 @@ window.WL = window.WL || {};
     },
     load: function () {
       try {
-        var s = JSON.parse(localStorage.getItem('wl_save_v2') || 'null');
+        var s = JSON.parse(localStorage.getItem('wl_save_v3') || 'null');
         return s;
       } catch (e) { return null; }
     },
@@ -45,11 +45,15 @@ window.WL = window.WL || {};
     J.TX.init(J.R);
     J.buildScene();
 
-    J.C = new THREE.PerspectiveCamera(38, window.innerWidth / window.innerHeight, 0.08, 1500);
-    J.C.position.set(J.ST.spawnX, 4, 22);
+    J.C = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.08, 1500);
+    J.C.position.set(0, 6, 130);
 
-    J.ST.build(J.S);
-
+    J.T.build(J.S);
+    J.T.buildWater(J.S);
+    J.T.farRidge(J.S);
+    J.W.build(J.S);
+    J.W.embankment(J.S);
+    J.W.vegetation(J.S);
     J.A.mats();
     // 合并静态网格，降低 draw call
     var mg = J.mergeStatic(J.S);
@@ -59,9 +63,10 @@ window.WL = window.WL || {};
 
     // 主角
     var save = J.PROG.load();
-    var sx = J.ST.spawnX, sz = 0;
-    if (save && isFinite(save.x)) sx = save.x;
-    J.H.spawn(J.S, sx, 0);
+    var sx = J.T.riverX(120) - 19, sz = 120;
+    if (save && isFinite(save.x) && isFinite(save.z) && !inSolid(save.x, save.z) &&
+        Math.abs(save.x - J.T.riverX(save.z)) < 45) { sx = save.x; sz = save.z; }
+    J.H.spawn(J.S, sx, sz);
     if (save) {
       J.H.setWeapon(save.weapon || 'dao');
       J.H.hp = save.hp || J.H.hpMax;
@@ -71,7 +76,7 @@ window.WL = window.WL || {};
     }
 
     // 敌人
-    J.ST.foeSpawns.forEach(function (s) { J.F.spawn(J.S, s.x, 0, s.type); });
+    J.W.foeSpots.forEach(function (s) { J.F.spawn(J.S, s.x, s.z, s.type); });
     // NPC
     J.NPC.build();
 
@@ -87,7 +92,13 @@ window.WL = window.WL || {};
     loop();
   };
 
-  function inSolid() { return false; }
+  function inSolid(x, z) {
+    for (var i = 0; i < J.W.colliders.length; i++) {
+      var c = J.W.colliders[i];
+      if (Math.abs(x - c.x) < c.hw + 0.6 && Math.abs(z - c.z) < c.hd + 0.6) return true;
+    }
+    return false;
+  }
 
   J.INTERACT = function () {
     var npc = J.NPC.nearest(J.H.pos, 3.2);
@@ -105,18 +116,28 @@ window.WL = window.WL || {};
       J.UI.dialog(npc.name, txt);
       return;
     }
-    var foe = J.F.nearestTo(J.H.pos, 3.2);
+    var foe = J.F.nearestTo(J.H.pos, 3.0);
     if (foe && foe.broken) J.CB.tryExecute();
   };
 
+  var forcedPortrait = false;
   function onResize() {
     var w = window.innerWidth, h = window.innerHeight;
     J.R.setSize(w, h, false);
     J.C.aspect = w / h;
+    // 宽屏用更平缓的视野，保证横向能看到更多场景
+    J.C.fov = w / h > 1.7 ? 56 : 62;
     J.C.updateProjectionMatrix();
     var hint = document.getElementById('hint');
     if (hint) hint.style.display = 'none';
+    // 横屏提示
+    var rot = document.getElementById('rotate');
+    if (rot) {
+      var portrait = h > w;
+      rot.classList.toggle('show', portrait && !forcedPortrait);
+    }
   }
+  window.__forcePortrait = function () { forcedPortrait = true; var r = document.getElementById('rotate'); if (r) r.classList.remove('show'); };
 
   var slowT = 0, simT = 0, frameCount = 0;
   function loop() {
@@ -139,18 +160,21 @@ window.WL = window.WL || {};
 
     if (J.H.state !== 'dead') {
       var m = J.IN.move;
-      var canMove = (J.H.state === 'idle' || J.H.state === 'run' || J.H.state === 'move' || J.H.state === 'block');
-      if (Math.abs(m.x) > 0.12 && canMove) {
-        J.H.move(sdt, m.x > 0 ? 1 : -1, 0, !!J.IN.run);
+      var moving = Math.hypot(m.x, m.y) > 0.08;
+      var camYaw = J.IN.camYaw;
+      // 摇杆方向转换到世界坐标（相对相机）
+      var wx = m.x * Math.cos(camYaw) + m.y * Math.sin(camYaw);
+      var wz = -m.x * Math.sin(camYaw) + m.y * Math.cos(camYaw);
+      var canMove = (J.H.state === 'idle' || J.H.state === 'run' || J.H.state === 'block');
+      if (moving && canMove) {
+        J.H.move(sdt, wx, wz, !!J.IN.run);
         J.H.state = J.IN.run ? 'run' : 'move';
       } else if (canMove) {
         J.H.state = 'idle';
-        J.H.speedNow = 0;
       }
-      J.H.physics(sdt);
       J.H.snapGround();
     } else {
-      J.H.physics(sdt);
+      J.H.snapGround();
     }
 
     J.CB.update(sdt);
@@ -174,7 +198,7 @@ window.WL = window.WL || {};
     J.CAM.update(dt, J.H);
     J.FX.update(dt);
     J.UI.updateHUD();
-    if (J.ST.waterMat) J.ST.waterMat.uniforms.t.value = t;
+    if (J.T.waterMat) J.T.waterMat.uniforms.t.value = t;
 
     J.R.render(J.S, J.C);
 
@@ -188,8 +212,8 @@ window.WL = window.WL || {};
   }
 
   G.respawn = function () {
-    var x = J.ST.spawnX;
-    J.H.pos.set(x, J.ST.groundY(x), 0);
+    var x = J.T.riverX(120) - 19, z = 120;
+    J.H.pos.set(x, J.T.heightAt(x, z), z);
     J.H.hp = J.H.hpMax;
     J.H.stam = J.H.stamMax;
     J.H.state = 'idle';
