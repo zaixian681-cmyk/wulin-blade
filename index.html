@@ -63,11 +63,14 @@
   #btnBlock{right:124px;bottom:14px;width:64px;height:64px}
   #btnSwap{right:22px;bottom:214px;width:58px;height:58px;font-size:12px}
   #btnExec{right:206px;bottom:40px;width:62px;height:62px;font-size:12px;opacity:.45}
+  #btnSkill{right:206px;bottom:200px;width:66px;height:66px;font-size:15px}
+  #btnSkill.cd{opacity:.45}
   #btnExec.ready{opacity:1;box-shadow:inset 0 0 0 2px #ffd166,0 0 16px rgba(255,209,102,.55)}
   #btnJam{right:206px;bottom:118px;width:52px;height:52px;font-size:12px;opacity:.5}
   #btnUse{right:206px;bottom:118px}
 
   /* ---------- 对话框 / 提示 ---------- */
+  #flash{position:absolute;inset:0;pointer-events:none;opacity:0;z-index:15}
   #toast{position:absolute;left:50%;top:19%;transform:translate(-50%,-6px);padding:9px 18px;
     background:rgba(12,14,12,.78);border:1px solid rgba(214,190,140,.35);border-radius:6px;
     font-size:13px;color:#f0e6cf;opacity:0;transition:all .25s;z-index:30;pointer-events:none;white-space:nowrap}
@@ -123,6 +126,8 @@
   <div class="btn" id="btnBlock">御</div>
   <div class="btn" id="btnSwap">换兵</div>
   <div class="btn" id="btnExec">处决</div>
+<div class="btn" id="btnSkill">技</div>
+<div id="flash"></div>
 
   <div id="toast"></div>
   <div id="dialog">
@@ -134,20 +139,20 @@
   <div id="hint">江湖初入……</div>
 </div>
 <script src="js/three.min.js"></script>
-<script src="js/textures.js?v=98"></script>
-<script src="js/core.js?v=98"></script>
-<script src="js/terrain.js?v=98"></script>
-<script src="js/arch.js?v=98"></script>
-<script src="js/town.js?v=98"></script>
-<script src="js/legacy-hero.js?v=98"></script>
-<script src="js/legacy-slash.js?v=98"></script>
-<script src="js/legacy-weapon.js?v=98"></script>
-<script src="js/hero.js?v=98"></script>
-<script src="js/fx.js?v=98"></script>
-<script src="js/combat.js?v=98"></script>
-<script src="js/foe.js?v=98"></script>
-<script src="js/ui.js?v=98"></script>
-<script src="js/merge.js?v=98"></script>
-<script src="js/game.js?v=98"></script>
+<script src="js/textures.js?v=102"></script>
+<script src="js/core.js?v=102"></script>
+<script src="js/terrain.js?v=102"></script>
+<script src="js/arch.js?v=102"></script>
+<script src="js/town.js?v=102"></script>
+<script src="js/legacy-hero.js?v=102"></script>
+<script src="js/legacy-slash.js?v=102"></script>
+<script src="js/legacy-weapon.js?v=102"></script>
+<script src="js/hero.js?v=102"></script>
+<script src="js/fx.js?v=102"></script>
+<script src="js/combat.js?v=102"></script>
+<script src="js/foe.js?v=102"></script>
+<script src="js/ui.js?v=102"></script>
+<script src="js/merge.js?v=102"></script>
+<script src="js/game.js?v=102"></script>
 </body>
 </html>

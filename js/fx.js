@@ -246,3 +246,155 @@ window.WL = window.WL || {};
     J.updateShadow(hero.pos.x, hero.pos.z);
   };
 })();
+
+/* ============================================================
+   技能特效：能量月牙 / 光柱 / 地面冲击环 / 尘土 / 闪屏
+   ============================================================ */
+(function () {
+  var J = WL, FX = J.FX;
+
+  function additive(color, opacity) {
+    return new THREE.MeshBasicMaterial({
+      color: color, transparent: true, opacity: opacity === undefined ? 0.85 : opacity,
+      side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending, fog: false
+    });
+  }
+
+  /* 月牙能量波：向前飞出的巨大弧光 */
+  FX.energyWave = function (pos, dir, color, size) {
+    size = size || 1;
+    var geo = new THREE.RingGeometry(0.55, 1.6, 26, 1, Math.PI * 0.62, Math.PI * 0.76);
+    var mat = additive(color || 0xbfe8ff, 0.95);
+    var m = new THREE.Mesh(geo, mat);
+    m.position.copy(pos); m.position.y += 1.25;
+    m.rotation.y = Math.atan2(dir.x, dir.z) - Math.PI / 2;
+    m.rotation.x = -Math.PI / 2 + 0.42;
+    m.scale.setScalar(size);
+    m.renderOrder = 40;
+    J.S.add(m);
+
+    // 核心亮线
+    var geo2 = new THREE.RingGeometry(0.9, 1.05, 26, 1, Math.PI * 0.66, Math.PI * 0.68);
+    var m2 = new THREE.Mesh(geo2, additive(0xffffff, 1));
+    m2.position.copy(m.position); m2.rotation.copy(m.rotation); m2.scale.setScalar(size);
+    m2.renderOrder = 41;
+    J.S.add(m2);
+
+    var t = 0, life = 0.42, speed = 16 * size;
+    FX.tick = FX.tick || [];
+    FX.tick.push(function (dt) {
+      t += dt;
+      var k = t / life;
+      m.position.x += dir.x * speed * dt;
+      m.position.z += dir.z * speed * dt;
+      m2.position.copy(m.position);
+      m.scale.setScalar(size * (1 + k * 1.5));
+      m2.scale.setScalar(size * (1 + k * 1.4));
+      mat.opacity = Math.max(0, 0.95 * (1 - k));
+      m2.material.opacity = Math.max(0, 1 - k * 1.4);
+      if (t > life) { J.S.remove(m); J.S.remove(m2); geo.dispose(); geo2.dispose(); return false; }
+      return true;
+    });
+  };
+
+  /* 竖直光柱（大斩/落雷） */
+  FX.beam = function (pos, color, height, radius) {
+    height = height || 9; radius = radius || 0.55;
+    var geo = new THREE.CylinderGeometry(radius * 0.35, radius, height, 12, 1, true);
+    var mat = new THREE.ShaderMaterial({
+      transparent: true, depthWrite: false, side: THREE.DoubleSide,
+      blending: THREE.AdditiveBlending, fog: false,
+      uniforms: { uColor: { value: new THREE.Color(color || 0xcfeaff) }, uT: { value: 0 } },
+      vertexShader: 'varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
+      fragmentShader: [
+        'uniform vec3 uColor; uniform float uT; varying vec2 vUv;',
+        'void main(){',
+        ' float edge = pow(1.0-abs(vUv.y-0.5)*2.0, 1.4);',
+        ' float core = pow(1.0-abs(vUv.x-0.5)*2.0, 3.0);',
+        ' float a = (0.35+0.65*core) * edge * (1.0-uT*0.85);',
+        ' gl_FragColor = vec4(uColor*(1.0+core), a);',
+        '}'
+      ].join('\n')
+    });
+    var m = new THREE.Mesh(geo, mat);
+    m.position.set(pos.x, pos.y + height / 2, pos.z);
+    m.renderOrder = 42;
+    J.S.add(m);
+    var t = 0, life = 0.5;
+    FX.tick = FX.tick || [];
+    FX.tick.push(function (dt) {
+      t += dt;
+      mat.uniforms.uT.value = t / life;
+      m.scale.x = m.scale.z = 1 + (t / life) * 1.8;
+      if (t > life) { J.S.remove(m); geo.dispose(); mat.dispose(); return false; }
+      return true;
+    });
+  };
+
+  /* 地面冲击环 */
+  FX.groundRing = function (pos, color, maxR, dur) {
+    maxR = maxR || 7; dur = dur || 0.55;
+    var geo = new THREE.RingGeometry(0.6, 1.0, 36);
+    var mat = additive(color || 0xffe2a8, 0.9);
+    var m = new THREE.Mesh(geo, mat);
+    m.position.set(pos.x, pos.y + 0.06, pos.z);
+    m.rotation.x = -Math.PI / 2;
+    m.renderOrder = 38;
+    J.S.add(m);
+    var t = 0;
+    FX.tick = FX.tick || [];
+    FX.tick.push(function (dt) {
+      t += dt;
+      var k = t / dur;
+      m.scale.setScalar(1 + k * maxR);
+      mat.opacity = Math.max(0, 0.9 * (1 - k));
+      if (t > dur) { J.S.remove(m); geo.dispose(); mat.dispose(); return false; }
+      return true;
+    });
+  };
+
+  /* 尘土/碎屑 */
+  FX.dust = function (pos, n, color) {
+    n = n || 18;
+    var g = new THREE.BufferGeometry();
+    var arr = new Float32Array(n * 3), vel = [];
+    for (var i = 0; i < n; i++) {
+      var a = Math.random() * 6.283, r = Math.random() * 0.6;
+      arr[i * 3] = pos.x + Math.cos(a) * r;
+      arr[i * 3 + 1] = pos.y + Math.random() * 0.3;
+      arr[i * 3 + 2] = pos.z + Math.sin(a) * r;
+      vel.push(new THREE.Vector3(Math.cos(a) * J.rand(2, 7), J.rand(0.5, 2.6), Math.sin(a) * J.rand(2, 7)));
+    }
+    g.setAttribute('position', new THREE.BufferAttribute(arr, 3));
+    var mat = new THREE.PointsMaterial({ color: color || 0xcbbfa4, size: 0.28, transparent: true, opacity: 0.9, depthWrite: false });
+    var p = new THREE.Points(g, mat);
+    J.S.add(p);
+    var t = 0;
+    FX.tick = FX.tick || [];
+    FX.tick.push(function (dt) {
+      t += dt;
+      var at = g.attributes.position;
+      for (var i2 = 0; i2 < n; i2++) {
+        vel[i2].y -= 5 * dt;
+        at.setXYZ(i2, at.getX(i2) + vel[i2].x * dt, Math.max(pos.y + 0.05, at.getY(i2) + vel[i2].y * dt), at.getZ(i2) + vel[i2].z * dt);
+      }
+      at.needsUpdate = true;
+      mat.opacity = Math.max(0, 0.9 * (1 - t / 0.7));
+      if (t > 0.7) { J.S.remove(p); g.dispose(); mat.dispose(); return false; }
+      return true;
+    });
+  };
+
+  /* 全屏闪光（DOM，便宜） */
+  FX.screenFlash = function (color, dur) {
+    var el = document.getElementById('flash');
+    if (!el) return;
+    el.style.background = color || 'rgba(200,235,255,0.55)';
+    el.style.transition = 'none';
+    el.style.opacity = '1';
+    requestAnimationFrame(function () {
+      el.style.transition = 'opacity ' + (dur || 0.32) + 's ease-out';
+      el.style.opacity = '0';
+    });
+  };
+})();

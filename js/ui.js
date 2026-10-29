@@ -10,71 +10,98 @@ window.WL = window.WL || {};
 
   UI.init = function () {
     var stick = el('stick'), knob = el('knob');
-    var activeId = null, R = 46, ccx = 0, ccy = 0;
+    var activeId = null, anchorX = 0, anchorY = 0, R = 46;
 
-    // 摇杆中心（容器坐标，随旋转一起变）
-    function center() {
-      ccx = stick.offsetLeft + stick.offsetWidth / 2;
-      ccy = stick.offsetTop + stick.offsetHeight / 2;
-      R = stick.offsetWidth * 0.42;
+    UI.touchActive = false;
+
+    function stageRect() { return document.getElementById('stage').getBoundingClientRect(); }
+
+    /* 手指按下处作为摇杆中心（浮动摇杆，最跟手） */
+    function begin(px, py, id) {
+      var st = stageRect();
+      var rot = J.Stage.rot;
+      // 把摇杆图形移动到手指位置（容器坐标）
+      var c = J.toStage(px, py);
+      stick.style.left = (c.x - 66) + 'px';
+      stick.style.top = (c.y - 66) + 'px';
+      stick.style.bottom = 'auto';
+      stick.style.opacity = '1';
+      anchorX = px; anchorY = py;
+      activeId = id;
+      UI.touchActive = true;
+      var w = stick.offsetWidth || 132;
+      R = w * 0.42;
+      knob.style.transform = 'translate(0,0)';
+      J.IN.move.x = 0; J.IN.move.y = 0; J.IN.run = false;
     }
 
-    function applyPoint(clientX, clientY) {
-      var p = J.toStage(clientX, clientY);      // 屏幕 → 容器坐标
-      var dx = p.x - ccx, dy = p.y - ccy;
-      var d = Math.hypot(dx, dy);
-      if (d > R) { dx = dx / d * R; dy = dy / d * R; d = R; }
+    function update(px, py) {
+      if (activeId === null) return;
+      var st = stageRect();
+      var rot = J.Stage.rot;
+      // 屏幕位移 → 容器位移
+      var d = J.deltaStage(px - anchorX, py - anchorY);
+      var dx = d.x, dy = d.y;
+      var len = Math.hypot(dx, dy);
+      if (len > R) { dx = dx / len * R; dy = dy / len * R; len = R; }
       knob.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
       J.IN.move.x = dx / R;
-      J.IN.move.y = -dy / R;      // 屏幕向上 = 前进
-      J.IN.run = Math.hypot(J.IN.move.x, J.IN.move.y) > 0.68;
+      J.IN.move.y = -dy / R;         // 容器向上 = 前进
+      J.IN.run = Math.hypot(J.IN.move.x, J.IN.move.y) > 0.72;
     }
 
-    function start(e) {
-      var t = e.changedTouches ? e.changedTouches[0] : e;
-      center();
-      activeId = t.identifier;
-      UI.touchActive = true;
-      applyPoint(t.clientX, t.clientY);
-    }
-    function move(e) {
-      var ts = e.changedTouches || [e];
-      for (var i = 0; i < ts.length; i++) {
-        if (ts[i].identifier !== activeId) continue;
-        applyPoint(ts[i].clientX, ts[i].clientY);
-      }
-      e.preventDefault();
-    }
-    function end(e) {
+    function finish() {
       activeId = null;
       UI.touchActive = false;
       knob.style.transform = 'translate(0,0)';
       J.IN.move.x = 0; J.IN.move.y = 0; J.IN.run = false;
+      J.IN.forceZero = true;          // 让主循环下一帧再确认一次归零
+      stick.style.opacity = '0.45';
+      stick.style.left = '22px';
+      stick.style.top = 'auto';
+      stick.style.bottom = '26px';
     }
-    stick.addEventListener('touchstart', start, { passive: false });
-    stick.addEventListener('touchmove', move, { passive: false });
-    stick.addEventListener('touchend', end);
-    stick.addEventListener('touchcancel', end);
-    // 关键：手指滑出摇杆/被系统打断时，touchend 不一定派发到元素上
-    window.addEventListener('touchend', function (e) {
+
+    /* 左半屏任意位置按下都能起摇杆 */
+    var stage = el('stage');
+    stage.addEventListener('touchstart', function (e) {
+      var t = e.changedTouches[0];
+      if (t.target.closest('.btn') || t.target.closest('#flipBtn') || t.target.closest('#qBtn')) return;
+      var st = stageRect();
+      var r = J.toStage(t.clientX, t.clientY);
+      if (r.x > J.Stage.W * 0.48) return;      // 右半屏留给视角
+      if (activeId !== null) return;
+      begin(t.clientX, t.clientY, t.identifier);
+      e.preventDefault();
+    }, { passive: false });
+
+    window.addEventListener('touchmove', function (e) {
+      for (var i = 0; i < e.changedTouches.length; i++) {
+        var t = e.changedTouches[i];
+        if (t.identifier === activeId) { update(t.clientX, t.clientY); e.preventDefault(); }
+      }
+    }, { passive: false });
+
+    function upHandler(e) {
       if (activeId === null) return;
       var ts = e.changedTouches || [];
-      for (var i = 0; i < ts.length; i++) if (ts[i].identifier === activeId) { end(); return; }
-    }, { passive: true });
-    window.addEventListener('touchcancel', function () { if (activeId !== null) end(); }, { passive: true });
-    window.addEventListener('blur', function () { if (activeId !== null) end(); });
-    document.addEventListener('visibilitychange', function () {
-      if (document.hidden && activeId !== null) end();
-    });
+      for (var i = 0; i < ts.length; i++) if (ts[i].identifier === activeId) { finish(); return; }
+    }
+    window.addEventListener('touchend', upHandler, { passive: true });
+    window.addEventListener('touchcancel', function () { if (activeId !== null) finish(); }, { passive: true });
+    window.addEventListener('blur', function () { if (activeId !== null) finish(); });
+    document.addEventListener('visibilitychange', function () { if (document.hidden && activeId !== null) finish(); });
 
-    // 兜底看门狗：标记是否还有手指按在摇杆上
-    UI.touchActive = false;
     // 鼠标调试
     var md = false;
-    stick.addEventListener('mousedown', function (e) { md = true; var t = e; t.identifier = 1; start(e); });
-    window.addEventListener('mousemove', function (e) { if (md) { var t = e; t.identifier = 1; move(e); } });
-    window.addEventListener('mouseup', function () { if (md) { md = false; end(); } });
-    window.addEventListener('resize', function () { center(); });
+    stage.addEventListener('mousedown', function (e) {
+      if (e.target.closest('.btn')) return;
+      var r = J.toStage(e.clientX, e.clientY);
+      if (r.x > J.Stage.W * 0.48) return;
+      md = true; begin(e.clientX, e.clientY, 1);
+    });
+    window.addEventListener('mousemove', function (e) { if (md) update(e.clientX, e.clientY); });
+    window.addEventListener('mouseup', function () { if (md) { md = false; finish(); } });
 
     /* 视角拖动（右半屏空白） */
     var camId = null, lastX = 0, lastY = 0;
@@ -114,6 +141,7 @@ window.WL = window.WL || {};
     bind('btnBlock', function () { J.IN.block = true; }, function () { J.IN.block = false; });
     bind('btnSwap', function () { J.CB.onSwap(); });
     bind('btnExec', function () { J.CB.tryExecute(); });
+    bind('btnSkill', function () { J.CB.castSkill(); });
     bind('btnJam', function () { /* 跳跃：Phase 2 */ });
 
     // 键盘（桌面调试）
@@ -125,6 +153,7 @@ window.WL = window.WL || {};
       if (e.key === 'l' || e.key === 'L') J.IN.block = true;
       if (e.key === 'q' || e.key === 'Q') J.CB.onSwap();
       if (e.key === 'e' || e.key === 'E') J.CB.tryExecute();
+      if (e.key === 'r' || e.key === 'R') J.CB.castSkill();
       if (e.key === 'f' || e.key === 'F') J.INTERACT();
     });
     window.addEventListener('keyup', function (e) {
@@ -156,7 +185,7 @@ window.WL = window.WL || {};
   function cache() {
     C = {
       hp: el('hpFill'), st: el('stFill'), wn: el('weaponName'), wk: el('weaponKind'),
-      exec: el('btnExec'), bar: el('foeBar'), fname: el('foeName'), fhp: el('foeHp'), fbrk: el('foeBreak')
+      exec: el('btnExec'), skill: el('btnSkill'), bar: el('foeBar'), fname: el('foeName'), fhp: el('foeHp'), fbrk: el('foeBreak')
     };
   }
   UI.updateHUD = function () {
@@ -170,6 +199,11 @@ window.WL = window.WL || {};
     var tn = J.F.nearestTo(H.pos, 3.0);
     var canExec = tn && !tn.dead && tn.broken;
     C.exec.classList.toggle('ready', !!canExec);
+    var cd = J.CB.skillCd ? J.CB.skillCd[H.weapon] : 0;
+    if (C.skill) {
+      C.skill.classList.toggle('cd', cd > 0);
+      C.skill.textContent = cd > 0 ? cd.toFixed(1) : '技';
+    }
     // 目标血条
     var target = tn && !tn.dead ? tn : null;
     if (target) {

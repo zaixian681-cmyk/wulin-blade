@@ -184,9 +184,10 @@ window.WL = window.WL || {};
     var t = simT;
 
     J.IN.tick(dt);
-    // 手指已离开但摇杆值没归零（移动端丢 touchend）→ 强制复位
-    if (!J.UI.touchActive && (J.IN.move.x !== 0 || J.IN.move.y !== 0)) {
-      J.IN.move.x = 0; J.IN.move.y = 0; J.IN.run = false;
+    // 摇杆松手后强制归零（移动端可能丢 touchend）
+    if (J.IN.forceZero) {
+      J.IN.forceZero = false;
+      if (!J.UI.touchActive) { J.IN.move.x = 0; J.IN.move.y = 0; J.IN.run = false; }
     }
 
     // 命中顿帧
@@ -199,8 +200,9 @@ window.WL = window.WL || {};
       var moving = Math.hypot(m.x, m.y) > 0.08;
       var camYaw = J.IN.camYaw;
       // 摇杆方向转换到世界坐标（相对相机）
-      var wx = m.x * Math.cos(camYaw) + m.y * Math.sin(camYaw);
-      var wz = -m.x * Math.sin(camYaw) + m.y * Math.cos(camYaw);
+      // 相机相对移动：forward = (sin,cos)，right = (-cos,sin)
+      var wx = Math.sin(camYaw) * m.y - Math.cos(camYaw) * m.x;
+      var wz = Math.cos(camYaw) * m.y + Math.sin(camYaw) * m.x;
       var canMove = (J.H.state === 'idle' || J.H.state === 'run' || J.H.state === 'move' || J.H.state === 'block');
       if (moving && canMove) {
         J.H.move(sdt, wx, wz, !!J.IN.run);
