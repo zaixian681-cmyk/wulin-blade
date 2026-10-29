@@ -209,6 +209,7 @@ window.WL = window.WL || {};
         J.H.state = J.IN.run ? 'run' : 'move';
       } else if (canMove) {
         J.H.state = 'idle';
+        if (!moving) J.H.speedNow = 0;
       }
       J.H.snapGround();
     } else {
@@ -216,6 +217,13 @@ window.WL = window.WL || {};
     }
 
     J.CB.update(sdt);
+
+    // 脱战回血：6 秒未受伤且附近没有敌人
+    J.H._noHitT = (J.H._noHitT || 0) + dt;
+    if (J.H._noHitT > 6 && J.H.hp < J.H.hpMax) {
+      var nearFoe = J.F.nearestTo(J.H.pos, 14);
+      if (!nearFoe) J.H.hp = Math.min(J.H.hpMax, J.H.hp + 9 * dt);
+    }
     J.F.update(sdt, J.H);
     J.H.updateAnim(dt, J.H.speedNow > 0.1, J.H.speedNow || 0);
     J.H.mesh.position.copy(J.H.pos);

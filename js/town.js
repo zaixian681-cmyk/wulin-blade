@@ -170,12 +170,13 @@ window.WL = window.WL || {};
     /* ---- 石拱桥两座 ---- */
     [12, -92].forEach(function (z) {
       var bx = T.riverX(z);
-      var br = A.bridge({ len: 34, w: 4.4, rise: 2.6 });
-      var by = Math.max(T.heightAt(bx - 15, z), T.heightAt(bx + 15, z)) - 0.5;
+      var br = A.bridge({ len: 34, w: 4.6, rise: 3.1 });
+      // 桥沿 X 横跨河道，两端落在两岸台地上
+      var yL = T.heightAt(bx - 17, z), yR = T.heightAt(bx + 17, z);
+      var by = Math.min(yL, yR) - 0.02;
       br.group.position.set(bx, by, z);
-      br.group.rotation.y = Math.PI / 2;
       scene.add(br.group);
-      W.bridges.push({ x: bx, z: z, y: by, len: 34, w: 4.4, rise: 2.6, axis: 'x' });
+      W.bridges.push({ x: bx, z: z, y: by, len: 34, w: 4.6, rise: 3.1, axis: 'x' });
     });
 
     /* ---- 牌坊 ---- */

@@ -168,10 +168,12 @@ window.WL = window.WL || {};
     for (var i = 0; i < J.W.bridges.length; i++) {
       var b = J.W.bridges[i];
       var dx = Math.abs(H.pos.x - b.x), dz = Math.abs(H.pos.z - b.z);
-      if (dx < b.len / 2 && dz < b.w / 2 + 0.4) {
-        var t = 1 - (dx / (b.len / 2));
-        var by = b.y + Math.sin(Math.max(0, Math.min(1, t)) * Math.PI) * b.rise + 0.06;
-        h = Math.max(h, by);
+      if (dx <= b.len / 2 + 0.6 && dz <= b.w / 2 + 0.5) {
+        // 桥面为一半正弦拱，两端与岸齐平
+        var p = J.clamp(dx / (b.len / 2), 0, 1);       // 0=桥心 1=桥端
+        var by = b.y + Math.cos(p * Math.PI / 2) * b.rise + 0.08;
+        // 只在桥面高于地形时接管高度（避免与岸坡打架）
+        if (by > J.T.heightAt(H.pos.x, H.pos.z) - 0.05) h = Math.max(h, by);
       }
     }
     H.pos.y = J.damp(H.pos.y, h, 18, 1 / 60);
@@ -201,7 +203,9 @@ window.WL = window.WL || {};
   H.updateAnim = function (dt, moving, speed) {
     animT += dt;
     var run = J.clamp(speed / H.speedRun, 0, 1);
-    walkPhase += dt * (2.4 + run * 5.0);
+    var moving = speed > 0.15;
+    var moveK = moving ? J.clamp(speed / H.speedWalk, 0, 1.4) : 0;   // 0=站立
+    walkPhase += dt * (2.4 + run * 5.0) * (moving ? 1 : 0);
 
     var sw = Math.sin(walkPhase), sw2 = Math.sin(walkPhase * 2);
     var R = H.rest;
@@ -211,14 +215,15 @@ window.WL = window.WL || {};
     H.head.rotation.x = R.head.x + Math.sin(animT * 1.3) * 0.02;
 
     // 步伐
-    var stride = 0.30 + run * 0.46;
+    var stride = (0.30 + run * 0.46) * moveK;
     H.legR.hip.rotation.x = sw * stride;
     H.legL.hip.rotation.x = -sw * stride;
+    if (!moving) { H.legR.knee.rotation.x = 0; H.legL.knee.rotation.x = 0; }
     H.legR.knee.rotation.x = Math.max(0, -sw) * 0.55;
     H.legL.knee.rotation.x = Math.max(0, sw) * 0.55;
 
     // 身体起伏与转动
-    H.hips.position.y = 0.86 + Math.abs(sw2) * 0.028 * (0.4 + run);
+    H.hips.position.y = 0.86 + Math.abs(sw2) * 0.028 * (0.4 + run) * Math.min(1, moveK);
     H.hips.rotation.y = R.hips.y + sw * 0.05;
     H.torso.rotation.y = sw * 0.07;
     H.torso.rotation.x = run * 0.12;
@@ -227,10 +232,10 @@ window.WL = window.WL || {};
     // 手臂
     var baseR = -0.35 + run * 0.1;
     var baseL = -0.1 + run * 0.5;
-    H.armR.shoulder.rotation.x = baseR - sw * 0.28 * (0.3 + run * 0.7);
+    H.armR.shoulder.rotation.x = baseR - sw * 0.28 * (0.3 + run * 0.7) * moveK;
     H.armR.shoulder.rotation.z = -0.18;
     H.armR.elbow.rotation.x = -0.45 - run * 0.4;
-    H.armL.shoulder.rotation.x = baseL + sw * 0.45 * (0.3 + run * 0.7);
+    H.armL.shoulder.rotation.x = baseL + sw * 0.45 * (0.3 + run * 0.7) * moveK;
     H.armL.shoulder.rotation.z = 0.16;
     H.armL.elbow.rotation.x = -0.35 - run * 0.45;
 

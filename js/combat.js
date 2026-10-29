@@ -163,8 +163,16 @@ window.WL = window.WL || {};
     S.iframe = 0.3;
     var m = J.IN.move;
     var len = Math.hypot(m.x, m.y);
-    if (len < 0.15) { S.dodgeDir.set(Math.sin(H.yaw), 0, Math.cos(H.yaw)); }
-    else { S.dodgeDir.set(m.x / len, 0, m.y / len); }
+    var cy = J.IN.camYaw;
+    if (len < 0.15) {
+      // 没有方向输入：向后闪（背离朝向）
+      S.dodgeDir.set(-Math.sin(H.yaw), 0, -Math.cos(H.yaw));
+    } else {
+      // 与移动同一套相机相对换算
+      var wx = Math.sin(cy) * m.y - Math.cos(cy) * m.x;
+      var wz = Math.cos(cy) * m.y + Math.sin(cy) * m.x;
+      S.dodgeDir.set(wx / len, 0, wz / len);
+    }
     return true;
   };
 
@@ -306,7 +314,7 @@ window.WL = window.WL || {};
 
     // 体力
     if (H.state !== 'dodge' && H.state !== 'attack') {
-      H.stam = Math.min(H.stamMax, H.stam + dt * (S.blockHeld ? 9 : 16));
+      H.stam = Math.min(H.stamMax, H.stam + dt * (S.blockHeld ? 14 : 30));
     }
 
     // 格挡
@@ -507,6 +515,7 @@ window.WL = window.WL || {};
   /* ---------------- 玩家受击 ---------------- */
   CB.playerHit = function (dmg, fromPos, isHeavy) {
     var H = J.H;
+    H._noHitT = 0;
     if (H.state === 'dead') return;
     if (S.iframe > 0) return;
 
