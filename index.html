@@ -10,11 +10,13 @@
   html,body{margin:0;height:100%;overflow:hidden;background:#0a0c0b;
     font-family:-apple-system,"PingFang SC","Noto Sans CJK SC",sans-serif;
     color:#eee;user-select:none;touch-action:none;overscroll-behavior:none}
-  #stage{position:fixed;inset:0}
+  #stage{position:fixed;left:0;top:0;overflow:hidden;transform-origin:0 0}
+  #stage.rot90{transform:rotate(90deg) translateY(-100%)}
+  #stage.rot270{transform:rotate(-90deg) translateX(-100%)}
   #gl{display:block;width:100%;height:100%}
 
   /* ---------- HUD ---------- */
-  #hud{position:fixed;inset:0;pointer-events:none;z-index:10}
+  #hud{position:absolute;inset:0;pointer-events:none;z-index:10}
   #hpWrap{position:absolute;left:16px;top:14px;width:min(46vw,220px)}
   .bar{height:7px;border-radius:4px;background:rgba(0,0,0,.5);overflow:hidden;margin-bottom:5px;
     box-shadow:inset 0 0 0 1px rgba(255,255,255,.14)}
@@ -34,10 +36,12 @@
   #foeBreak{background:linear-gradient(90deg,#c99b2e,#ffe08a);width:0}
   #foeHp{background:linear-gradient(90deg,#7a2020,#e0553f)}
 
+  #flipBtn{position:absolute;right:12px;top:30px;font-size:11px;color:#cfc4a8;
+    border:1px solid rgba(200,175,120,.4);border-radius:6px;padding:5px 9px;pointer-events:auto}
   #fps{position:absolute;right:12px;top:12px;font-size:10px;color:rgba(255,255,255,.45);font-variant-numeric:tabular-nums}
 
   /* ---------- 摇杆 ---------- */
-  #stick{position:fixed;left:22px;bottom:26px;width:132px;height:132px;border-radius:50%;
+  #stick{position:absolute;left:22px;bottom:26px;width:132px;height:132px;border-radius:50%;
     background:radial-gradient(circle,rgba(255,255,255,.09),rgba(255,255,255,.03));
     box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.18);z-index:20;touch-action:none}
   #knob{position:absolute;left:50%;top:50%;width:58px;height:58px;margin:-29px 0 0 -29px;border-radius:50%;
@@ -45,7 +49,7 @@
     box-shadow:0 2px 10px rgba(0,0,0,.6)}
 
   /* ---------- 按钮 ---------- */
-  .btn{position:fixed;display:flex;align-items:center;justify-content:center;border-radius:50%;
+  .btn{position:absolute;display:flex;align-items:center;justify-content:center;border-radius:50%;
     font-size:13px;font-weight:600;letter-spacing:1px;color:#f3e9d2;
     background:radial-gradient(circle at 38% 32%,rgba(70,66,58,.92),rgba(24,24,22,.86));
     box-shadow:inset 0 0 0 1.5px rgba(230,210,170,.28),0 3px 10px rgba(0,0,0,.5);
@@ -62,12 +66,12 @@
   #btnUse{right:206px;bottom:118px}
 
   /* ---------- 对话框 / 提示 ---------- */
-  #toast{position:fixed;left:50%;top:19%;transform:translate(-50%,-6px);padding:9px 18px;
+  #toast{position:absolute;left:50%;top:19%;transform:translate(-50%,-6px);padding:9px 18px;
     background:rgba(12,14,12,.78);border:1px solid rgba(214,190,140,.35);border-radius:6px;
     font-size:13px;color:#f0e6cf;opacity:0;transition:all .25s;z-index:30;pointer-events:none;white-space:nowrap}
   #toast.show{opacity:1;transform:translate(-50%,0)}
 
-  #dialog{position:fixed;left:50%;bottom:26%;transform:translateX(-50%) translateY(10px);
+  #dialog{position:absolute;left:50%;bottom:26%;transform:translateX(-50%) translateY(10px);
     width:min(88vw,520px);background:rgba(10,12,10,.9);border:1px solid rgba(200,175,120,.35);
     border-radius:10px;padding:14px 16px;z-index:40;opacity:0;pointer-events:none;transition:all .2s}
   #dialog.show{opacity:1;transform:translateX(-50%) translateY(0);pointer-events:auto}
@@ -75,9 +79,9 @@
   #dlgText{font-size:14px;line-height:1.65;color:#eee6d4}
   #dlgNext{margin-top:10px;text-align:right;font-size:13px;color:#c8b183}
 
-  #err{position:fixed;left:10px;top:10px;z-index:99;display:none;max-width:80vw;
+  #err{position:absolute;left:10px;top:10px;z-index:99;display:none;max-width:80vw;
     background:rgba(120,20,20,.92);color:#fff;padding:8px 10px;border-radius:6px;font-size:12px;white-space:pre-wrap}
-  #rotate{position:fixed;inset:0;z-index:95;display:none;flex-direction:column;
+  #rotate{position:absolute;inset:0;z-index:95;display:none;flex-direction:column;
     align-items:center;justify-content:center;gap:10px;background:rgba(8,10,9,.96);text-align:center}
   #rotate.show{display:flex}
   .rotIcon{font-size:44px;color:#c8b183;animation:spin 3s linear infinite}
@@ -86,66 +90,58 @@
   .rotSub{font-size:12px;line-height:1.9;color:#9d9madd;color:#9a9384}
   .rotBtn{margin-top:8px;padding:9px 20px;border:1px solid rgba(200,175,120,.5);
     border-radius:999px;font-size:13px;color:#d9c69a}
-  #hint{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+  #hint{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
     background:#0a0c0b;color:#c8b183;font-size:13px;letter-spacing:3px;z-index:90}
 </style>
 </head>
 <body>
-<div id="stage"><canvas id="gl"></canvas></div>
+<div id="stage">
+  <canvas id="gl"></canvas>
 
-<div id="hud">
-  <div id="hpWrap">
-    <div class="bar"><i id="hpFill"></i></div>
-    <div class="bar" id="stWrap"><i id="stFill"></i></div>
-    <div id="weaponBox"><span id="weaponKind"></span><span id="weaponName"></span></div>
+  <div id="hud">
+    <div id="hpWrap">
+      <div class="bar"><i id="hpFill"></i></div>
+      <div class="bar" id="stWrap"><i id="stFill"></i></div>
+      <div id="weaponBox"><span id="weaponKind"></span><span id="weaponName"></span></div>
+    </div>
+    <div id="foeBar">
+      <div id="foeName"></div>
+      <div class="bar"><i id="foeHp"></i></div>
+      <div class="bar" style="height:4px"><i id="foeBreak"></i></div>
+    </div>
+    <div id="fps"></div>
+    <div id="flipBtn">翻转</div>
   </div>
-  <div id="foeBar">
-    <div id="foeName"></div>
-    <div class="bar"><i id="foeHp"></i></div>
-    <div class="bar" style="height:4px"><i id="foeBreak"></i></div>
+
+  <div id="stick"><div id="knob"></div></div>
+  <div class="btn" id="btnAtk">斩</div>
+  <div class="btn" id="btnHeavy">重</div>
+  <div class="btn" id="btnDodge">闪</div>
+  <div class="btn" id="btnBlock">御</div>
+  <div class="btn" id="btnSwap">换兵</div>
+  <div class="btn" id="btnExec">处决</div>
+
+  <div id="toast"></div>
+  <div id="dialog">
+    <div id="dlgName"></div>
+    <div id="dlgText"></div>
+    <div id="dlgNext">继续 ›</div>
   </div>
-  <div id="fps"></div>
+  <div id="err"></div>
+  <div id="hint">江湖初入……</div>
 </div>
-
-<div id="stick"><div id="knob"></div></div>
-<div class="btn" id="btnAtk">斩</div>
-<div class="btn" id="btnHeavy">重</div>
-<div class="btn" id="btnDodge">闪</div>
-<div class="btn" id="btnBlock">御</div>
-<div class="btn" id="btnSwap">换兵</div>
-<div class="btn" id="btnExec">处决</div>
-<div class="btn" id="btnJam">跳</div>
-
-<div id="toast"></div>
-<div id="dialog">
-  <div id="dlgName"></div>
-  <div id="dlgText"></div>
-  <div id="dlgNext">继续 ›</div>
-</div>
-<div id="err"></div>
-<div id="hint">江湖初入……</div>
-<div id="rotate">
-  <div class="rotIcon">⟳</div>
-  <div class="rotTitle">请横屏游玩</div>
-  <div class="rotSub">《武林 · 血刃江湖》为横屏 3D 游戏<br>把手机转横可获得完整视野</div>
-  <div class="rotBtn" id="rotGo">仍然竖屏进入</div>
-</div>
-
 <script src="js/three.min.js"></script>
-<script src="js/textures.js?v=64"></script>
-<script src="js/core.js?v=64"></script>
-<script src="js/terrain.js?v=64"></script>
-<script src="js/arch.js?v=64"></script>
-<script src="js/town.js?v=64"></script>
-<script src="js/hero.js?v=64"></script>
-<script src="js/fx.js?v=64"></script>
-<script src="js/combat.js?v=64"></script>
-<script src="js/foe.js?v=64"></script>
-<script src="js/ui.js?v=64"></script>
-<script src="js/merge.js?v=64"></script>
-<script src="js/game.js?v=64"></script>
-<script>
-document.getElementById('rotGo').addEventListener('click', function(){ window.__forcePortrait && window.__forcePortrait(); });
-</script>
+<script src="js/textures.js?v=75"></script>
+<script src="js/core.js?v=75"></script>
+<script src="js/terrain.js?v=75"></script>
+<script src="js/arch.js?v=75"></script>
+<script src="js/town.js?v=75"></script>
+<script src="js/hero.js?v=75"></script>
+<script src="js/fx.js?v=75"></script>
+<script src="js/combat.js?v=75"></script>
+<script src="js/foe.js?v=75"></script>
+<script src="js/ui.js?v=75"></script>
+<script src="js/merge.js?v=75"></script>
+<script src="js/game.js?v=75"></script>
 </body>
 </html>

@@ -120,23 +120,40 @@ window.WL = window.WL || {};
     if (foe && foe.broken) J.CB.tryExecute();
   };
 
-  var forcedPortrait = false;
+  var flipDeg = 0;   // 0 = 90°，1 = 270°
+  function layout() {
+    var vw = window.innerWidth, vh = window.innerHeight;
+    var portrait = vh > vw;
+    var st = document.getElementById('stage');
+    if (!st) return { w: vw, h: vh };
+    st.classList.remove('rot90', 'rot270');
+    var w, h, rot = 0;
+    if (portrait) {
+      rot = flipDeg ? 270 : 90;
+      st.classList.add(rot === 90 ? 'rot90' : 'rot270');
+      w = vh; h = vw;      // 逻辑尺寸：宽=屏幕高，高=屏幕宽
+    } else {
+      w = vw; h = vh;
+    }
+    st.style.width = w + 'px';
+    st.style.height = h + 'px';
+    J.Stage.W = w; J.Stage.H = h; J.Stage.rot = rot;
+    return { w: w, h: h, rot: rot };
+  }
+
   function onResize() {
-    var w = window.innerWidth, h = window.innerHeight;
-    J.R.setSize(w, h, false);
-    J.C.aspect = w / h;
-    // 宽屏用更平缓的视野，保证横向能看到更多场景
-    J.C.fov = w / h > 1.7 ? 56 : 62;
+    var L = layout();
+    J.R.setSize(L.w, L.h, false);
+    J.C.aspect = L.w / L.h;
+    J.C.fov = L.w / L.h > 1.7 ? 56 : 62;
     J.C.updateProjectionMatrix();
     var hint = document.getElementById('hint');
     if (hint) hint.style.display = 'none';
-    // 横屏提示
-    var rot = document.getElementById('rotate');
-    if (rot) {
-      var portrait = h > w;
-      rot.classList.toggle('show', portrait && !forcedPortrait);
-    }
   }
+
+  window.addEventListener('orientationchange', function () { setTimeout(onResize, 120); });
+  window.__flip = function () { flipDeg = flipDeg ? 0 : 1; onResize(); };
+
   window.__forcePortrait = function () { forcedPortrait = true; var r = document.getElementById('rotate'); if (r) r.classList.remove('show'); };
 
   var slowT = 0, simT = 0, frameCount = 0;

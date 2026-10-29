@@ -27,6 +27,7 @@ window.WL = window.WL || {};
     J.dpr = J.dprMax;
     r.setPixelRatio(J.dpr);
     r.setSize(window.innerWidth, window.innerHeight, false);
+    J.Stage = { W: window.innerWidth, H: window.innerHeight, rot: 0 };
     r.shadowMap.enabled = true;
     r.shadowMap.type = THREE.PCFSoftShadowMap;
     r.shadowMap.autoUpdate = true;
@@ -120,6 +121,23 @@ window.WL = window.WL || {};
       roughness: rough === undefined ? 0.9 : rough,
       metalness: metal || 0
     });
+  };
+
+  /* ---------------- 舞台与坐标换算 ---------------- */
+  J.Stage = { W: 1, H: 1, rot: 0 };
+  /* 屏幕坐标 → 舞台（游戏）坐标 */
+  J.toStage = function (sx, sy) {
+    var st = J.Stage;
+    if (st.rot === 90) return { x: sy, y: st.H - sx };
+    if (st.rot === 270) return { x: st.W - sy, y: sx };
+    return { x: sx, y: sy };
+  };
+  /* 屏幕位移 → 舞台位移 */
+  J.deltaStage = function (dx, dy) {
+    var st = J.Stage;
+    if (st.rot === 90) return { x: dy, y: -dx };
+    if (st.rot === 270) return { x: -dy, y: dx };
+    return { x: dx, y: dy };
   };
 
   /* ---------------- 输入 ---------------- */

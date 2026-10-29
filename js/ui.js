@@ -10,27 +10,37 @@ window.WL = window.WL || {};
 
   UI.init = function () {
     var stick = el('stick'), knob = el('knob');
-    var activeId = null, cx = 0, cy = 0, R = 46;
+    var activeId = null, R = 46, ccx = 0, ccy = 0;
+
+    // 摇杆中心（容器坐标，随旋转一起变）
+    function center() {
+      ccx = stick.offsetLeft + stick.offsetWidth / 2;
+      ccy = stick.offsetTop + stick.offsetHeight / 2;
+      R = stick.offsetWidth * 0.42;
+    }
+
+    function applyPoint(clientX, clientY) {
+      var p = J.toStage(clientX, clientY);      // 屏幕 → 容器坐标
+      var dx = p.x - ccx, dy = p.y - ccy;
+      var d = Math.hypot(dx, dy);
+      if (d > R) { dx = dx / d * R; dy = dy / d * R; d = R; }
+      knob.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
+      J.IN.move.x = dx / R;
+      J.IN.move.y = -dy / R;      // 屏幕向上 = 前进
+      J.IN.run = Math.hypot(J.IN.move.x, J.IN.move.y) > 0.68;
+    }
 
     function start(e) {
       var t = e.changedTouches ? e.changedTouches[0] : e;
-      var r = stick.getBoundingClientRect();
-      cx = r.left + r.width / 2; cy = r.top + r.height / 2;
-      R = r.width * 0.42;
+      center();
       activeId = t.identifier;
-      move(t);
+      applyPoint(t.clientX, t.clientY);
     }
     function move(e) {
       var ts = e.changedTouches || [e];
       for (var i = 0; i < ts.length; i++) {
         if (ts[i].identifier !== activeId) continue;
-        var dx = ts[i].clientX - cx, dy = ts[i].clientY - cy;
-        var d = Math.hypot(dx, dy);
-        var k = d > R ? R / d : 1;
-        knob.style.transform = 'translate(' + (dx * k) + 'px,' + (dy * k) + 'px)';
-        var nx = (dx * k) / R, ny = (dy * k) / R;
-        J.IN.move.x = nx; J.IN.move.y = ny;
-        J.IN.run = Math.hypot(nx, ny) > 0.72;
+        applyPoint(ts[i].clientX, ts[i].clientY);
       }
       e.preventDefault();
     }
@@ -48,6 +58,7 @@ window.WL = window.WL || {};
     stick.addEventListener('mousedown', function (e) { md = true; var t = e; t.identifier = 1; start(e); });
     window.addEventListener('mousemove', function (e) { if (md) { var t = e; t.identifier = 1; move(e); } });
     window.addEventListener('mouseup', function () { if (md) { md = false; end(); } });
+    window.addEventListener('resize', function () { center(); });
 
     /* 视角拖动（右半屏空白） */
     var camId = null, lastX = 0, lastY = 0;
@@ -61,10 +72,10 @@ window.WL = window.WL || {};
       for (var i = 0; i < e.changedTouches.length; i++) {
         var t = e.changedTouches[i];
         if (t.identifier !== camId) continue;
-        var dx = t.clientX - lastX, dy = t.clientY - lastY;
+        var sd = J.deltaStage(t.clientX - lastX, t.clientY - lastY);
         lastX = t.clientX; lastY = t.clientY;
-        J.IN.camYaw -= dx * 0.006;
-        J.IN.camPitch = J.clamp(J.IN.camPitch + dy * 0.004, -0.3, 1.0);
+        J.IN.camYaw -= sd.x * 0.006;
+        J.IN.camPitch = J.clamp(J.IN.camPitch + sd.y * 0.004, -0.3, 1.0);
       }
     }, { passive: true });
     stage.addEventListener('touchend', function () { camId = null; });
@@ -80,6 +91,8 @@ window.WL = window.WL || {};
     bind('btnAtk', function () { J.CB.onAttackPressed(false); });
     bind('btnHeavy', function () { J.CB.onAttackPressed(true); });
     bind('btnDodge', function () { J.CB.onDodge(); });
+    var fb = el('flipBtn');
+    if (fb) fb.addEventListener('click', function () { window.__flip && window.__flip(); });
     bind('btnBlock', function () { J.IN.block = true; }, function () { J.IN.block = false; });
     bind('btnSwap', function () { J.CB.onSwap(); });
     bind('btnExec', function () { J.CB.tryExecute(); });
