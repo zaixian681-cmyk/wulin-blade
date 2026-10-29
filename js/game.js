@@ -165,7 +165,7 @@ window.WL = window.WL || {};
       // 摇杆方向转换到世界坐标（相对相机）
       var wx = m.x * Math.cos(camYaw) + m.y * Math.sin(camYaw);
       var wz = -m.x * Math.sin(camYaw) + m.y * Math.cos(camYaw);
-      var canMove = (J.H.state === 'idle' || J.H.state === 'run' || J.H.state === 'block');
+      var canMove = (J.H.state === 'idle' || J.H.state === 'run' || J.H.state === 'move' || J.H.state === 'block');
       if (moving && canMove) {
         J.H.move(sdt, wx, wz, !!J.IN.run);
         J.H.state = J.IN.run ? 'run' : 'move';
